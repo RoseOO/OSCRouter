@@ -879,6 +879,7 @@ QString ProtocolComboBox::ProtocolName(Protocol protocol)
   {
     case Protocol::kOSC: return tr("OSC");
     case Protocol::kPSN: return tr("PSN");
+    case Protocol::ksACN: return tr("sACN");
   }
 
   return tr("Unknown(%1)").arg(static_cast<int>(protocol));

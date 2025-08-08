@@ -24,9 +24,7 @@
 #include "EosTcp.h"
 #include <psn_lib.hpp>
 
-#ifdef WIN32
-#include <WinSock2.h>
-#else
+#ifndef WIN32
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -1077,7 +1075,8 @@ void RouterThread::Flush(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, UDP_IN_THREADS &udpInThreads, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads, TCP_SERVER_THREADS &tcpServerThreads)
+void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, UDP_IN_THREADS &udpInThreads, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads,
+                               TCP_SERVER_THREADS &tcpServerThreads)
 {
   m_PrivateLog.AddInfo("Building Routing Table...");
 
@@ -1150,17 +1149,26 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, UDP_IN_THREADS &udp
       Router::sRoute route(*i);
       QHostAddress srcAddr(route.src.addr.ip);
 
+      ROUTES_BY_PORT *routes = &routesByPort;
+
       // create udp input thread on each network interface if necessary
-      for (std::vector<QNetworkAddressEntry>::const_iterator j = nics.begin(); j != nics.end(); j++)
+      if (route.src.protocol == Protocol::ksACN)
       {
-        EosAddr inAddr(j->ip().toString(), route.src.addr.port);
-        if (udpInThreads.find(inAddr) == udpInThreads.end())
+        routes = &routesBysACNUniverse;
+      }
+      else
+      {
+        for (std::vector<QNetworkAddressEntry>::const_iterator j = nics.begin(); j != nics.end(); j++)
         {
-          if (route.src.addr.ip.isEmpty() || srcAddr == j->ip() || srcAddr.isInSubnet(j->ip(), j->prefixLength()))
+          EosAddr inAddr(j->ip().toString(), route.src.addr.port);
+          if (udpInThreads.find(inAddr) == udpInThreads.end())
           {
-            EosUdpInThread *thread = new EosUdpInThread();
-            udpInThreads[inAddr] = thread;
-            thread->Start(inAddr, route.src.multicastIP, route.src.protocol, route.srcItemStateTableId, m_ReconnectDelay);
+            if (route.src.addr.ip.isEmpty() || srcAddr == j->ip() || srcAddr.isInSubnet(j->ip(), j->prefixLength()))
+            {
+              EosUdpInThread *thread = new EosUdpInThread();
+              udpInThreads[inAddr] = thread;
+              thread->Start(inAddr, route.src.multicastIP, route.src.protocol, route.srcItemStateTableId, m_ReconnectDelay);
+            }
           }
         }
       }
@@ -1169,17 +1177,17 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, UDP_IN_THREADS &udp
         route.dst.addr.port = route.src.addr.port;  // no destination port specified, so assume same port as source
 
       // create udp output thread if known dst, and not an explicit tcp client
-      if (tcpClientThreads.find(route.dst.addr) == tcpClientThreads.end())
+      if (route.dst.protocol != Protocol::ksACN && tcpClientThreads.find(route.dst.addr) == tcpClientThreads.end())
         CreateUdpOutThread(route.dst.addr, route.dstItemStateTableId, udpOutThreads);
 
       // add entry to main routing table...
 
       // sorted 1st by port
-      ROUTES_BY_PORT::iterator portIter = routesByPort.find(route.src.addr.port);
-      if (portIter == routesByPort.end())
+      ROUTES_BY_PORT::iterator portIter = routes->find(route.src.addr.port);
+      if (portIter == routes->end())
       {
         ROUTES_BY_IP empty;
-        portIter = routesByPort.insert(ROUTES_BY_PORT_PAIR(route.src.addr.port, empty)).first;
+        portIter = routes->insert(ROUTES_BY_PORT_PAIR(route.src.addr.port, empty)).first;
       }
 
       // sorted 2nd by ip
@@ -1214,6 +1222,122 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, UDP_IN_THREADS &udp
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool RouterThread::HasProtocolOutput(const ROUTES_BY_PORT &routesByPort, Protocol protocol)
+{
+  for (ROUTES_BY_PORT::const_iterator i = routesByPort.begin(); i != routesByPort.end(); ++i)
+  {
+    if (HasProtocolOutput(i->second, protocol))
+      return true;
+  }
+
+  return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool RouterThread::HasProtocolOutput(const ROUTES_BY_IP &routesByIp, Protocol protocol)
+{
+  for (ROUTES_BY_IP::const_iterator ipIter = routesByIp.begin(); ipIter != routesByIp.end(); ++ipIter)
+  {
+    if (HasProtocolOutput(ipIter->second.routesByPath, protocol) || HasProtocolOutput(ipIter->second.routesByWildcardPath, protocol))
+      return true;
+  }
+
+  return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool RouterThread::HasProtocolOutput(const ROUTES_BY_PATH &routesByPath, Protocol protocol)
+{
+  for (ROUTES_BY_PATH::const_iterator pathIter = routesByPath.begin(); pathIter != routesByPath.end(); ++pathIter)
+  {
+    const ROUTE_DESTINATIONS &destinations = pathIter->second;
+    for (ROUTE_DESTINATIONS::const_iterator dstIter = destinations.begin(); dstIter != destinations.end(); ++dstIter)
+    {
+      if (dstIter->dst.protocol == protocol)
+        return true;
+    }
+  }
+
+  return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void RouterThread::DestroysACN(sACN &sacn)
+{
+  if (sacn.server)
+  {
+    IPlatformStreamACNSrv::DestroyInstance(sacn.server);
+    sacn.server = nullptr;
+  }
+
+  if (sacn.client)
+  {
+    IPlatformStreamACNCli::DestroyInstance(sacn.client);
+    sacn.client = nullptr;
+  }
+
+  if (sacn.net)
+  {
+    IPlatformAsyncSocketServ::DestroyInstance(sacn.net);
+    sacn.net = nullptr;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void RouterThread::BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, sACN &sacn)
+{
+  bool hasInput = !routesBysACNUniverse.empty();
+  bool hasOutput = HasProtocolOutput(routesByPort, Protocol::ksACN);
+  if (!hasInput && !hasOutput)
+    return;
+
+  sacn.net = IPlatformAsyncSocketServ::CreateInstance();
+  if (!sacn.net)
+    return;
+
+  if (!sacn.net->Startup())
+  {
+    DestroysACN(sacn);
+    return;
+  }
+
+  if (hasInput)
+  {
+    sacn.client = IPlatformStreamACNCli::CreateInstance();
+    if (sacn.client)
+    {
+      if (sacn.client->Startup(sacn.net, this))
+      {
+        for (ROUTES_BY_PORT::const_iterator i = routesBysACNUniverse.begin(); i != routesBysACNUniverse.end(); ++i)
+          sacn.client->ListenUniverse(i->first, nullptr, 0);
+      }
+      else
+      {
+        IPlatformStreamACNCli::DestroyInstance(sacn.client);
+        sacn.client = nullptr;
+      }
+    }
+  }
+
+  if (hasOutput)
+  {
+    sacn.server = IPlatformStreamACNSrv::CreateInstance();
+    if (sacn.server)
+    {
+      // TODO
+    }
+  }
+
+  if (!sacn.client && !sacn.server)
+    DestroysACN(sacn);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 EosUdpOutThread *RouterThread::CreateUdpOutThread(const EosAddr &addr, ItemStateTable::ID itemStateTableId, UDP_OUT_THREADS &udpOutThreads)
 {
   if (!addr.ip.isEmpty() && addr.port != 0)
@@ -1241,9 +1365,9 @@ void RouterThread::AddRoutingDestinations(bool isOSC, const QString &path, const
   if (isOSC && !path.isEmpty())
   {
     // exact matches
-    ROUTES_BY_PATH_RANGE pathsRange = routesByIp.routesByPath.equal_range(path);
-    for (; pathsRange.first != pathsRange.second; pathsRange.first++)
-      destinations.push_back(&(pathsRange.first->second));
+    ROUTES_BY_PATH::const_iterator pathIter = routesByIp.routesByPath.find(path);
+    if (pathIter != routesByIp.routesByPath.end())
+      destinations.push_back(&(pathIter->second));
 
     // wildcard matches
     if (!routesByIp.routesByWildcardPath.empty())
@@ -1258,9 +1382,9 @@ void RouterThread::AddRoutingDestinations(bool isOSC, const QString &path, const
 
   // send to any routes without an explicit path specified
   QString noPath;
-  ROUTES_BY_PATH_RANGE pathsRange = routesByIp.routesByPath.equal_range(noPath);
-  for (; pathsRange.first != pathsRange.second; pathsRange.first++)
-    destinations.push_back(&(pathsRange.first->second));
+  ROUTES_BY_PATH::const_iterator pathIter = routesByIp.routesByPath.find(noPath);
+  if (pathIter != routesByIp.routesByPath.end())
+    destinations.push_back(&(pathIter->second));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1322,22 +1446,22 @@ void RouterThread::ProcessRecvPacket(ROUTES_BY_PORT &routesByPort, DESTINATIONS_
   }
 
   // send to matching ports
-  ROUTES_BY_PORT_RANGE portsRange = routesByPort.equal_range(addr.port);
-  for (; portsRange.first != portsRange.second; portsRange.first++)
+  ROUTES_BY_PORT::const_iterator portsIter = routesByPort.find(addr.port);
+  if (portsIter != routesByPort.end())
   {
-    const ROUTES_BY_IP &routesByIp = portsRange.first->second;
+    const ROUTES_BY_IP &routesByIp = portsIter->second;
 
     // send to matching ips
-    ROUTES_BY_IP_RANGE ipsRange = routesByIp.equal_range(recvPacket.ip);
-    for (; ipsRange.first != ipsRange.second; ipsRange.first++)
-      AddRoutingDestinations(isOSC, path, ipsRange.first->second, routingDestinationList);
+    ROUTES_BY_IP::const_iterator ipIter = routesByIp.find(recvPacket.ip);
+    if (ipIter != routesByIp.end())
+      AddRoutingDestinations(isOSC, path, ipIter->second, routingDestinationList);
 
     // send to unspecified ips
     if (recvPacket.ip != 0)
     {
-      ipsRange = routesByIp.equal_range(0);
-      for (; ipsRange.first != ipsRange.second; ipsRange.first++)
-        AddRoutingDestinations(isOSC, path, ipsRange.first->second, routingDestinationList);
+      ipIter = routesByIp.find(0);
+      if (ipIter != routesByIp.end())
+        AddRoutingDestinations(isOSC, path, ipIter->second, routingDestinationList);
     }
   }
 
@@ -1852,6 +1976,7 @@ void RouterThread::run()
   TCP_CLIENT_THREADS tcpClientThreads;
   TCP_SERVER_THREADS tcpServerThreads;
   ROUTES_BY_PORT routesByPort;
+  ROUTES_BY_PORT routesBysACNUniverse;
   DESTINATIONS_LIST routingDestinationList;
   EosUdpInThread::RECV_Q recvQ;
   EosTcpServerThread::CONNECTION_Q tcpConnectionQ;
@@ -1860,7 +1985,10 @@ void RouterThread::run()
   OSCParser oscBundleParser;
   oscBundleParser.SetRoot(new OSCBundleMethod());
 
-  BuildRoutes(routesByPort, udpInThreads, udpOutThreads, tcpClientThreads, tcpServerThreads);
+  BuildRoutes(routesByPort, routesBysACNUniverse, udpInThreads, udpOutThreads, tcpClientThreads, tcpServerThreads);
+
+  sACN sacn;
+  BuildsACN(routesByPort, routesBysACNUniverse, sacn);
 
   while (m_Run)
   {
@@ -2008,6 +2136,8 @@ void RouterThread::run()
 
   m_ItemStateTable.Deactivate();
 
+  DestroysACN(sacn);
+
   delete m_PSNEncoder;
   m_PSNEncoder = nullptr;
 
@@ -2028,6 +2158,16 @@ void RouterThread::OSCParserClient_Log(const std::string &message)
 ////////////////////////////////////////////////////////////////////////////////
 
 void RouterThread::OSCParserClient_Send(const char * /*buf*/, size_t /*size*/) {}
+
+void RouterThread::SourceDisappeared(const CID & /*source*/, uint2 /*universe*/) {}
+void RouterThread::SourcePCPExpired(const CID & /*source*/, uint2 /*universe*/) {}
+void RouterThread::SamplingStarted(uint2 /*universe*/) {}
+void RouterThread::SamplingEnded(uint2 /*universe*/) {}
+void RouterThread::UniverseData(const CID & /*source*/, const char * /*source_name*/, const CIPAddr & /*source_ip*/, uint2 /*universe*/, uint2 /*reserved*/, uint1 /*sequence*/, uint1 /*options*/,
+                                uint1 /*priority*/, uint1 /*start_code*/, uint2 /*slot_count*/, uint1 * /*pdata*/)
+{
+}
+void RouterThread::UniverseBad(uint2 /*universe*/, netintid /*iface*/) {}
 
 ////////////////////////////////////////////////////////////////////////////////
 

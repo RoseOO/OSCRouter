@@ -52,18 +52,19 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\EosSyncLib\EosSyncLib;..\psn;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\EosSyncLib\EosSyncLib;..\psn;..\sACN\ACN\StreamingACN\Client;..\sACN\ACN\StreamingACN\Client\Src;..\sACN\ACN\StreamingACN\Client\Windows;..\sACN\ACN\StreamingACN\Common;..\sACN\ACN\StreamingACN\Server;..\sACN\ACN\StreamingACN\Server\Src;..\sACN\ACN\StreamingACN\Server\Windows;..\sACN\ACN\VHD;..\sACN\Network_Common\ACNTypes;..\sACN\Network_Common\AsyncSocket;..\sACN\Network_Common\AsyncSocket\Src;..\sACN\Network_Common\AsyncSocket\Windows;..\sACN\Network_Common\defpack\Windows;..\sACN\Network_Common\ObjectSync\Windows;..\sACN\Network_Common\Tock;..\sACN\Onyx_Common\Windows;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4127;4996;4512</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>-Zc:__cplusplus</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(QTOSCROUTER)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Qt6EntryPointd.lib;Qt6Cored.lib;Qt6Guid.lib;Qt6Widgetsd.lib;Qt6Networkd.lib;Qt6Qmld.lib;ws2_32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Qt6EntryPointd.lib;Qt6Cored.lib;Qt6Guid.lib;Qt6Widgetsd.lib;Qt6Networkd.lib;Qt6Qmld.lib;ws2_32.lib;winmm.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
     </Link>
@@ -77,20 +78,21 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\EosSyncLib\EosSyncLib;..\psn;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\EosSyncLib\EosSyncLib;..\psn;..\sACN\ACN\StreamingACN\Client;..\sACN\ACN\StreamingACN\Client\Src;..\sACN\ACN\StreamingACN\Client\Windows;..\sACN\ACN\StreamingACN\Common;..\sACN\ACN\StreamingACN\Server;..\sACN\ACN\StreamingACN\Server\Src;..\sACN\ACN\StreamingACN\Server\Windows;..\sACN\ACN\VHD;..\sACN\Network_Common\ACNTypes;..\sACN\Network_Common\AsyncSocket;..\sACN\Network_Common\AsyncSocket\Src;..\sACN\Network_Common\AsyncSocket\Windows;..\sACN\Network_Common\defpack\Windows;..\sACN\Network_Common\ObjectSync\Windows;..\sACN\Network_Common\Tock;..\sACN\Onyx_Common\Windows;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4127;4996;4512</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalOptions>-Zc:__cplusplus</AdditionalOptions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(QTOSCROUTER)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Qt6EntryPoint.lib;Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Qml.lib;ws2_32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Qt6EntryPoint.lib;Qt6Core.lib;Qt6Gui.lib;Qt6Widgets.lib;Qt6Network.lib;Qt6Qml.lib;ws2_32.lib;winmm.lib;iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
       <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
     </Link>
@@ -108,6 +110,20 @@
     <ClCompile Include="..\..\EosSyncLib\EosSyncLib\EosUdp.cpp" />
     <ClCompile Include="..\..\EosSyncLib\EosSyncLib\EosUdp_Win.cpp" />
     <ClCompile Include="..\..\EosSyncLib\EosSyncLib\OSCParser.cpp" />
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Client\Src\StreamClient.cpp" />
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Client\Windows\WinStreamClient.cpp" />
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Common\streamcommon.cpp" />
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Server\Src\StreamServer.cpp" />
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Server\Windows\WinStreamServer.cpp" />
+    <ClCompile Include="..\sACN\ACN\VHD\VHD.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\ACNTypes\Src\CID.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\ACNTypes\Src\ipaddr.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\AsyncSocket\Src\Subscriptions.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\AsyncSocket\Windows\AsyncSocketServ.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\ObjectSync\Windows\MemPool.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\ObjectSync\Windows\ObjectSync.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\ObjectSync\Windows\ReaderWriter.cpp" />
+    <ClCompile Include="..\sACN\Network_Common\Tock\Windows\tock.cpp" />
     <ClCompile Include="EosPlatform.cpp" />
     <ClCompile Include="ItemState.cpp" />
     <ClCompile Include="LogWidget.cpp" />
@@ -125,6 +141,29 @@
     <ClInclude Include="..\psn\psn_encoder.hpp" />
     <ClInclude Include="..\psn\psn_encoder_impl.hpp" />
     <ClInclude Include="..\psn\psn_lib.hpp" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\Src\StreamClient.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\StreamACNCliInterface.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\Windows\WinStreamClient.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\Windows\Win_StreamACNCliInterface.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Common\streamcommon.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\Src\StreamServer.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\StreamACNSrvInterface.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\Windows\WinStreamServer.h" />
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\Windows\Win_StreamACNSrvInterface.h" />
+    <ClInclude Include="..\sACN\ACN\VHD\VHD.h" />
+    <ClInclude Include="..\sACN\Network_Common\ACNTypes\CID.h" />
+    <ClInclude Include="..\sACN\Network_Common\ACNTypes\ipaddr.h" />
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\AsyncSocketInterface.h" />
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Src\SockUtil.h" />
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Src\Subscriptions.h" />
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Windows\AsyncSocketServ.h" />
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Windows\Win_AsyncSocketInterface.h" />
+    <ClInclude Include="..\sACN\Network_Common\defpack\Windows\defpack.h" />
+    <ClInclude Include="..\sACN\Network_Common\ObjectSync\Windows\MemPool.h" />
+    <ClInclude Include="..\sACN\Network_Common\ObjectSync\Windows\ObjectSync.h" />
+    <ClInclude Include="..\sACN\Network_Common\ObjectSync\Windows\ReaderWriter.h" />
+    <ClInclude Include="..\sACN\Network_Common\Tock\tock.h" />
+    <ClInclude Include="..\sACN\Onyx_Common\Windows\deftypes.h" />
     <ClInclude Include="EosPlatform.h" />
     <ClInclude Include="ItemState.h" />
     <ClInclude Include="LeakWatcher.h" />

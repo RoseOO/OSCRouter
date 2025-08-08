@@ -42,6 +42,50 @@
 #include "NetworkUtils.h"
 #endif
 
+#ifndef _DEFTYPES_H_
+#include "deftypes.h"
+#endif
+
+#ifndef _CID_H_
+#include "CID.h"
+#endif
+
+#ifndef _IPADDR_H_
+#include "ipaddr.h"
+#endif
+
+#ifndef _ASYNCSOCKETINTERFACE_H_
+#include "AsyncSocketInterface.h"
+#endif
+
+#ifndef _STREAMACNCLIINTERFACE_H_
+#include "StreamACNCliInterface.h"
+#endif
+
+#ifndef _STREAMACNSRVINTERFACE_H_
+#include "StreamACNSrvInterface.h"
+#endif
+
+#ifdef WIN32
+#include <WinSock2.h>
+
+#ifndef _WIN_ASYNCSOCKETINTERFACE_H_
+#include "Win_AsyncSocketInterface.h"
+#endif
+
+#ifndef _WIN_STREAMACNCLIINTERFACE_H_
+#include "Win_StreamACNCliInterface.h"
+#endif
+
+#ifndef _WIN_STREAMACNSRVINTERFACE_H_
+#include "Win_StreamACNSrvInterface.h"
+#endif
+
+#define IPlatformAsyncSocketServ IWinAsyncSocketServ
+#define IPlatformStreamACNCli IWinStreamACNCli
+#define IPlatformStreamACNSrv IWinStreamACNSrv
+#endif
+
 class EosTcp;
 
 namespace psn
@@ -299,7 +343,7 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class RouterThread : public QThread, private OSCParserClient
+class RouterThread : public QThread, private OSCParserClient, private IStreamACNCliNotify
 {
 public:
   RouterThread(const Router::ROUTES &routes, const Router::CONNECTIONS &tcpConnections, const ItemStateTable &itemStateTable, unsigned int reconnectDelayMS);
@@ -320,7 +364,6 @@ protected:
 
   typedef std::map<QString, ROUTE_DESTINATIONS> ROUTES_BY_PATH;
   typedef std::pair<QString, ROUTE_DESTINATIONS> ROUTES_BY_PATH_PAIR;
-  typedef std::pair<ROUTES_BY_PATH::const_iterator, ROUTES_BY_PATH::const_iterator> ROUTES_BY_PATH_RANGE;
 
   struct sRoutesByIp
   {
@@ -330,11 +373,9 @@ protected:
 
   typedef std::map<unsigned int, sRoutesByIp> ROUTES_BY_IP;
   typedef std::pair<unsigned int, sRoutesByIp> ROUTES_BY_IP_PAIR;
-  typedef std::pair<ROUTES_BY_IP::const_iterator, ROUTES_BY_IP::const_iterator> ROUTES_BY_IP_RANGE;
 
   typedef std::map<unsigned short, ROUTES_BY_IP> ROUTES_BY_PORT;
   typedef std::pair<unsigned short, ROUTES_BY_IP> ROUTES_BY_PORT_PAIR;
-  typedef std::pair<ROUTES_BY_PORT::const_iterator, ROUTES_BY_PORT::const_iterator> ROUTES_BY_PORT_RANGE;
 
   typedef std::map<EosAddr, EosUdpInThread *> UDP_IN_THREADS;
   typedef std::map<EosAddr, EosUdpOutThread *> UDP_OUT_THREADS;
@@ -343,6 +384,13 @@ protected:
   typedef std::map<EosAddr, EosTcpServerThread *> TCP_SERVER_THREADS;
 
   typedef std::vector<const ROUTE_DESTINATIONS *> DESTINATIONS_LIST;
+
+  struct sACN
+  {
+    IPlatformAsyncSocketServ *net = nullptr;
+    IPlatformStreamACNCli *client = nullptr;
+    IPlatformStreamACNSrv *server = nullptr;
+  };
 
   bool m_Run;
   unsigned int m_ReconnectDelay;
@@ -357,7 +405,9 @@ protected:
   QElapsedTimer m_PSNEncoderTimer;
 
   virtual void run();
-  virtual void BuildRoutes(ROUTES_BY_PORT &routesByPort, UDP_IN_THREADS &udpInThreads, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads, TCP_SERVER_THREADS &tcpServerThreads);
+  virtual void BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, UDP_IN_THREADS &udpInThreads, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads,
+                           TCP_SERVER_THREADS &tcpServerThreads);
+  virtual void BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, sACN &sacn);
   virtual EosUdpOutThread *CreateUdpOutThread(const EosAddr &addr, ItemStateTable::ID itemStateTableId, UDP_OUT_THREADS &udpOutThreads);
   virtual void AddRoutingDestinations(bool isOSC, const QString &path, const sRoutesByIp &routesByIp, DESTINATIONS_LIST &destinations);
   virtual void ProcessRecvQ(OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads,
@@ -374,6 +424,20 @@ protected:
   virtual void SetItemActivity(ItemStateTable::ID id);
   virtual void OSCParserClient_Log(const std::string &message);
   virtual void OSCParserClient_Send(const char *buf, size_t size);
+
+  // IStreamACNCliNotify
+  void SourceDisappeared(const CID &source, uint2 universe) override;
+  void SourcePCPExpired(const CID &source, uint2 universe) override;
+  void SamplingStarted(uint2 universe) override;
+  void SamplingEnded(uint2 universe) override;
+  void UniverseData(const CID &source, const char *source_name, const CIPAddr &source_ip, uint2 universe, uint2 reserved, uint1 sequence, uint1 options, uint1 priority, uint1 start_code,
+                    uint2 slot_count, uint1 *pdata) override;
+  void UniverseBad(uint2 universe, netintid iface) override;
+
+  static bool HasProtocolOutput(const ROUTES_BY_PORT &routesByPort, Protocol protocol);
+  static bool HasProtocolOutput(const ROUTES_BY_IP &routesByIp, Protocol protocol);
+  static bool HasProtocolOutput(const ROUTES_BY_PATH &routesByPath, Protocol protocol);
+  static void DestroysACN(sACN &sacn);
 };
 
 ////////////////////////////////////////////////////////////////////////////////

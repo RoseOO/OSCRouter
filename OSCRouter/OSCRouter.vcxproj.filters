@@ -31,6 +31,15 @@
     <Filter Include="psn\Header FIles">
       <UniqueIdentifier>{922adfef-c664-41fa-9a99-b40ee712ec40}</UniqueIdentifier>
     </Filter>
+    <Filter Include="sACN">
+      <UniqueIdentifier>{d2c561d2-2f3d-439a-9c8d-c35ef8554039}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sACN\Header Files">
+      <UniqueIdentifier>{7b5dc9d0-4f7d-4523-8910-c8e048b7eb4a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="sACN\Source Files">
+      <UniqueIdentifier>{c36de797-2aa3-47b6-a655-3d33cf89fdf4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -80,6 +89,48 @@
     </ClCompile>
     <ClCompile Include="LogWidget.cpp">
       <Filter>OSCRouter\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Client\Src\StreamClient.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Client\Windows\WinStreamClient.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Common\streamcommon.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Server\Src\StreamServer.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\ACN\StreamingACN\Server\Windows\WinStreamServer.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\ACN\VHD\VHD.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\ACNTypes\Src\CID.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\ACNTypes\Src\ipaddr.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\AsyncSocket\Src\Subscriptions.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\AsyncSocket\Windows\AsyncSocketServ.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\ObjectSync\Windows\MemPool.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\ObjectSync\Windows\ObjectSync.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\ObjectSync\Windows\ReaderWriter.cpp">
+      <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\sACN\Network_Common\Tock\Windows\tock.cpp">
+      <Filter>sACN\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -148,6 +199,75 @@
     </ClInclude>
     <ClInclude Include="..\psn\psn_lib.hpp">
       <Filter>psn\Header FIles</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\StreamACNCliInterface.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\Windows\Win_StreamACNCliInterface.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\Windows\WinStreamClient.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Client\Src\StreamClient.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Common\streamcommon.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\StreamACNSrvInterface.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\Src\StreamServer.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\Windows\Win_StreamACNSrvInterface.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\StreamingACN\Server\Windows\WinStreamServer.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\ACN\VHD\VHD.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\ACNTypes\CID.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\ACNTypes\ipaddr.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\AsyncSocketInterface.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Src\SockUtil.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Src\Subscriptions.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Windows\AsyncSocketServ.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\AsyncSocket\Windows\Win_AsyncSocketInterface.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\defpack\Windows\defpack.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\ObjectSync\Windows\MemPool.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\ObjectSync\Windows\ObjectSync.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\ObjectSync\Windows\ReaderWriter.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Onyx_Common\Windows\deftypes.h">
+      <Filter>sACN\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sACN\Network_Common\Tock\tock.h">
+      <Filter>sACN\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -82,6 +82,7 @@ enum class Protocol
 {
   kOSC = 0,
   kPSN,
+  ksACN,
 
   kCount,
   kDefault = kOSC,

@@ -1329,7 +1329,17 @@ void RouterThread::BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &route
   }
 
   if (hasOutput)
+  {
     sacn.server = IPlatformStreamACNSrv::CreateInstance();
+    if (sacn.server)
+    {
+      if (!sacn.server->Startup(sacn.net))
+      {
+        IPlatformStreamACNSrv::DestroyInstance(sacn.server);
+        sacn.server = nullptr;
+      }
+    }
+  }
 
   if (!sacn.client && !sacn.server)
     DestroysACN(sacn);

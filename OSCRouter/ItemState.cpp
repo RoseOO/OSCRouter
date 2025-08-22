@@ -24,8 +24,6 @@
 // must be last include
 #include "LeakWatcher.h"
 
-////////////////////////////////////////////////////////////////////////////////
-
 const ItemStateTable::ID ItemStateTable::sm_Invalid_Id = static_cast<ItemStateTable::ID>(0xffffffff);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,14 +33,10 @@ bool ItemState::operator==(const ItemState &other) const
   return (state == other.state && activity == other.activity);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 bool ItemState::operator!=(const ItemState &other) const
 {
   return (state != other.state || activity != other.activity);
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 void ItemState::GetStateName(EnumState state, QString &name)
 {
@@ -56,8 +50,6 @@ void ItemState::GetStateName(EnumState state, QString &name)
 
   name = QString();
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 void ItemState::GetStateColor(EnumState state, QColor &color)
 {
@@ -73,20 +65,11 @@ void ItemState::GetStateColor(EnumState state, QColor &color)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-ItemStateTable::ItemStateTable()
-  : m_Dirty(false)
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 void ItemStateTable::Clear()
 {
   m_List.clear();
   m_Dirty = false;
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 void ItemStateTable::Reset()
 {
@@ -95,8 +78,6 @@ void ItemStateTable::Reset()
   m_Dirty = false;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 void ItemStateTable::Deactivate()
 {
   ItemState deactivated;
@@ -104,13 +85,14 @@ void ItemStateTable::Deactivate()
     Update(i, deactivated);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 void ItemStateTable::Sync(ItemStateTable &other)
 {
+  size_t count = qMin(m_List.size(), other.m_List.size());
+
+  // update UI from Router Thread
   if (other.m_Dirty)
   {
-    for (ID i = 0; i < other.m_List.size(); i++)
+    for (size_t i = 0; i < count; i++)
     {
       ItemState &otherItemState = other.m_List[i];
       Update(i, otherItemState);
@@ -120,33 +102,54 @@ void ItemStateTable::Sync(ItemStateTable &other)
 
     other.m_Dirty = false;
   }
-}
 
-////////////////////////////////////////////////////////////////////////////////
+  // update Router Thread from UI
+  other.m_MuteAllIncoming = m_MuteAllIncoming;
+  other.m_MuteAllOutgoing = m_MuteAllOutgoing;
 
-ItemStateTable::ID ItemStateTable::Register()
-{
-  m_List.push_back(ItemState());
-  return (m_List.size() - 1);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-void ItemStateTable::Update(ID id, const ItemState &state)
-{
-  if (id < m_List.size())
+  if (m_Dirty)
   {
-    ItemState &itemState = m_List[id];
-    if (itemState != state)
-    {
-      itemState = state;
-      itemState.dirty = true;
-      m_Dirty = true;
-    }
+    for (size_t i = 0; i < count; i++)
+      other.m_List[i].mute = m_List[i].mute;
+
+    m_Dirty = false;
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
+ItemStateTable::ID ItemStateTable::Register(bool mute)
+{
+  ItemState state;
+  state.mute = mute;
+  m_List.push_back(state);
+  return (m_List.size() - 1);
+}
+
+void ItemStateTable::Update(ID id, const ItemState &state)
+{
+  if (id >= m_List.size())
+    return;
+
+  ItemState &itemState = m_List[id];
+  if (itemState == state)
+    return;
+
+  itemState = state;
+  itemState.dirty = true;
+  m_Dirty = true;
+}
+
+void ItemStateTable::Mute(ID id, bool b)
+{
+  if (id >= m_List.size())
+    return;
+
+  ItemState &itemState = m_List[id];
+  if (itemState.mute == b)
+    return;
+
+  itemState.mute = b;
+  m_Dirty = true;
+}
 
 const ItemState *ItemStateTable::GetItemState(ID id) const
 {

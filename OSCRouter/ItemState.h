@@ -42,19 +42,15 @@ public:
     STATE_COUNT
   };
 
-  ItemState()
-    : state(STATE_UNINITIALIZED)
-    , activity(false)
-    , dirty(false)
-  {
-  }
+  ItemState() = default;
 
   bool operator==(const ItemState &other) const;
   bool operator!=(const ItemState &other) const;
 
-  EnumState state;
-  bool activity;
-  bool dirty;
+  EnumState state = STATE_UNINITIALIZED;
+  bool activity = false;
+  bool mute = false;
+  bool dirty = false;
 
   static void GetStateName(EnumState state, QString &name);
   static void GetStateColor(EnumState state, QColor &color);
@@ -68,23 +64,30 @@ public:
   typedef size_t ID;
   typedef std::vector<ItemState> LIST;
 
-  ItemStateTable();
+  ItemStateTable() = default;
 
   virtual void Clear();
   virtual void Reset();
   virtual void Deactivate();
   virtual void Sync(ItemStateTable &other);
   virtual bool GetDirty() const { return m_Dirty; }
-  virtual ID Register();
+  virtual ID Register(bool mute);
   virtual void Update(ID id, const ItemState &state);
+  virtual bool GetMuteAllIncoming() const { return m_MuteAllIncoming; }
+  virtual void SetMuteAllIncoming(bool b) { m_MuteAllIncoming = b; }
+  virtual bool GetMuteAllOutgoing() const { return m_MuteAllOutgoing; }
+  virtual void SetMuteAllOutgoing(bool b) { m_MuteAllOutgoing = b; }
+  virtual void Mute(ID id, bool b);
   virtual const ItemState *GetItemState(ID id) const;
   virtual const LIST &GetList() const { return m_List; }
 
   static const ID sm_Invalid_Id;
 
 private:
-  bool m_Dirty;
+  bool m_MuteAllIncoming = false;
+  bool m_MuteAllOutgoing = false;
   LIST m_List;
+  bool m_Dirty = false;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

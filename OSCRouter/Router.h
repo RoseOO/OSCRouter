@@ -133,8 +133,10 @@ public:
     QString label;
     EosRouteSrc src;
     ItemStateTable::ID srcItemStateTableId = ItemStateTable::sm_Invalid_Id;
+    bool srcMute = false;
     EosRouteDst dst;
     ItemStateTable::ID dstItemStateTableId = ItemStateTable::sm_Invalid_Id;
+    bool dstMute = false;
   };
 
   typedef std::vector<sRoute> ROUTES;

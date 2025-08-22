@@ -193,8 +193,8 @@ public:
   explicit Splitter(QWidget* parent = nullptr);
   explicit Splitter(Qt::Orientation orientation, QWidget* parent = nullptr);
 
-private slots:
-  void onAutoSize(SplitterHandle* splitterHandle);
+public slots:
+  void autoSize(SplitterHandle* splitterHandle);
 
 protected:
   QSplitterHandle* createHandle() override;
@@ -346,32 +346,40 @@ public:
   QSize sizeHint() const { return QSize(1000, 1000); }
   void Clear();
   void Load(const QStringList& lines);
-  void LoadRoutes(const Router::ROUTES& routes);
+  void LoadRoutes(const Router::ROUTES& routes, const ItemStateTable& itemStateTable);
   void Save(QTextStream& stream);
-  void SaveRoutes(Router::ROUTES& routes, ItemStateTable* itemStateTable);
+  void SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemStateTable);
   void UpdateItemState(const ItemStateTable& itemStateTable);
 
   static void StringToTransform(const QString& str, EosRouteDst::sTransform& transform);
   static void TransformToString(const EosRouteDst::sTransform& transform, QString& str);
 
-protected:
-  void resizeEvent(QResizeEvent* event) override;
-  void showEvent(QShowEvent* event) override;
-  void paintEvent(QPaintEvent* event) override;
+signals:
+  void muteToggled(size_t id, bool checked);
+  void routeMuteToggled(size_t id, bool checked);
 
 private slots:
   void updateHeaders();
+  void onMuteToggled(size_t id, bool checked);
+  void onInMuteToggled(size_t row, bool checked);
+  void onOutMuteToggled(size_t row, bool checked);
   void onOutScriptToggled(size_t id, bool checked);
   void onAddRemoveClicked(size_t id);
   void onInProtocolChanged(size_t row, Protocol protocol);
   void onOutProtocolChanged(size_t row, Protocol protocol);
   void onHeaderHelpClicked(size_t id);
 
+protected:
+  void resizeEvent(QResizeEvent* event) override;
+  void showEvent(QShowEvent* event) override;
+  void paintEvent(QPaintEvent* event) override;
+
 private:
   enum class Col
   {
     kLabel = 0,
 
+    kInMute,
     kInState,
     kInActivity,
     kInIP,
@@ -383,6 +391,7 @@ private:
 
     kDivider,
 
+    kOutMute,
     kOutState,
     kOutActivity,
     kOutIP,
@@ -398,11 +407,18 @@ private:
     kCount
   };
 
+  struct Header
+  {
+    QWidget* base = nullptr;
+    RoutingCheckBox* mute = nullptr;
+  };
+
   struct Row
   {
     size_t id = 0;
     ItemStateTable::ID inItemStateTableId = ItemStateTable::sm_Invalid_Id;
     LineEdit* label = nullptr;
+    RoutingCheckBox* inMute = nullptr;
     Indicator* inState = nullptr;
     Indicator* inActivity = nullptr;
     LineEdit* inIP = nullptr;
@@ -413,6 +429,7 @@ private:
     LineEdit* inMax = nullptr;
     QLabel* divider = nullptr;
     ItemStateTable::ID outItemStateTableId = ItemStateTable::sm_Invalid_Id;
+    RoutingCheckBox* outMute = nullptr;
     Indicator* outState = nullptr;
     Indicator* outActivity = nullptr;
     LineEdit* outIP = nullptr;
@@ -436,15 +453,15 @@ private:
   typedef std::map<EosAddr, ItemStateTable::ID> AddrStates;
 
   Rows m_Rows;
-  QLabel* m_Incoming = nullptr;
-  QLabel* m_Outgoing = nullptr;
+  Header m_Incoming;
+  Header m_Outgoing;
   QWidget* m_Headers[static_cast<int>(Col::kCount)];
   QScrollArea* m_Scroll = nullptr;
   Splitter* m_Cols = nullptr;
   HelpDialog m_Help;
 
-  void LoadLine(const QString& line, Router::ROUTES& routes);
-  void AddRow(size_t id, bool remove, const QString& label, const EosRouteSrc& src, const EosRouteDst& dst);
+  void LoadLine(const QString& line, Router::ROUTES& routes, ItemStateTable& itemStateTable);
+  void AddRow(size_t id, bool remove, const QString& label, const Router::sRoute& route);
   void AddCol(int index, QWidget* w, bool fixed = false);
   void AddCol(int index, const RoutingCol::Widgets& w, bool fixed = false);
   void UpdateItemState(const ItemState* itemState, Indicator& stateIndicator, Indicator& activityIndicator);
@@ -483,6 +500,8 @@ private slots:
   void onClearLog();
   void onOpenLog();
   void onApplyClicked(bool checked);
+  void onMuteToggled(bool incoming, bool checked);
+  void onRouteMuteToggled(size_t id, bool checked);
 
 private:
   EosLog m_Log;

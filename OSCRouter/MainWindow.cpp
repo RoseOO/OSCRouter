@@ -911,8 +911,36 @@ RoutingWidget::RoutingWidget(QWidget* parent /*= nullptr*/)
 
   for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
   {
-    m_Headers[i] = new QLabel(HeaderForCol(static_cast<Col>(i)), this);
-    m_Headers[i]->setAlignment(Qt::AlignCenter);
+    QWidget* header = nullptr;
+
+    switch (static_cast<Col>(i))
+    {
+      case Col::kInPath:
+      case Col::kOutPath:
+      {
+        header = new QWidget(this);
+        QHBoxLayout* headerLayout = new QHBoxLayout(header);
+        headerLayout->setSpacing(6);
+        headerLayout->addStretch(std::numeric_limits<int>::max());
+        headerLayout->setContentsMargins(QMargins());
+        QLabel* label = new QLabel(HeaderForCol(static_cast<Col>(i)), header);
+        headerLayout->addWidget(label);
+        RoutingButton* button = new RoutingButton(QLatin1String("?"), static_cast<size_t>(i), header);
+        connect(button, &RoutingButton::clickedWithId, this, &RoutingWidget::onHeaderHelpClicked);
+        int n = button->sizeHint().height();
+        button->setFixedWidth(n);
+        headerLayout->addWidget(button);
+        headerLayout->addStretch(std::numeric_limits<int>::max());
+      }
+      break;
+
+      default:
+        header = new QLabel(HeaderForCol(static_cast<Col>(i)), this);
+        static_cast<QLabel*>(header)->setAlignment(Qt::AlignCenter);
+        break;
+    }
+
+    m_Headers[i] = header;
   }
   m_Headers[static_cast<int>(Col::kOutScript)]->setToolTip(tr("JavaScript"));
 
@@ -1047,7 +1075,6 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const E
   AddCol(col++, row.inIP);
 
   row.inPort = new QLineEdit(m_Cols->widget(col));
-  row.inPort->setToolTip(tr("Route packets received on this port (REQUIRED)"));
   row.inPort->setText((src.addr.port == 0) ? QString() : QString::number(src.addr.port));
   AddCol(col++, row.inPort);
 
@@ -1056,23 +1083,6 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const E
   AddCol(col++, row.inProtocol);
 
   row.inPath = new QLineEdit(m_Cols->widget(col));
-  row.inPath->setToolTip(
-      tr("Only route received OSC commands with this specific OSC command path\n"
-         "(use * for wildcard matching, ex: /eos/out/event/*)\n"
-         "\n"
-         "Leave blank to route received packets with any OSC command path (or non-OSC packets)\n"
-         "\n"
-         "Incoming PSN:\n"
-         "  Individual:\n"
-         "    /psn/<id>/pos=x,y,z\n"
-         "    /psn/<id>/speed=x,y,z\n"
-         "    /psn/<id>/orientation=x,y,z\n"
-         "    /psn/<id>/acceleration=x,y,z\n"
-         "    /psn/<id>/target=x,y,z\n"
-         "    /psn/<id>/status=status\n"
-         "    /psn/<id>/timestamp=timestamp\n"
-         "  Unified:\n"
-         "    /psn/<id>/pos/speed/orientation/acceleration/..."));
   row.inPath->setText(src.path);
   AddCol(col++, row.inPath);
 
@@ -1117,7 +1127,6 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const E
   AddCol(col++, row.outIP);
 
   row.outPort = new QLineEdit(m_Cols->widget(col));
-  row.outPort->setToolTip(tr("Route received packets to this port\n\nLeave blank to route packets to the same port they were received on"));
   row.outPort->setText((dst.addr.port == 0) ? QString() : QString::number(dst.addr.port));
   AddCol(col++, row.outPort);
 
@@ -1125,54 +1134,10 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const E
   connect(row.outProtocol, &ProtocolComboBox::protocolChanged, this, &RoutingWidget::onOutProtocolChanged);
   AddCol(col++, row.outProtocol);
 
-  QString tip =
-      tr("Route received OSC commands to this OSC command\n"
-         "\n"
-         "Use %1, %2, %3, etc... to insert specific sections from the received OSC command\n"
-         "\n"
-         "For PSN output, see incoming path tool tip for path formatting\n"
-         "\n"
-         "Ex: Remap path\n"
-         "Input:  /eos/out/event/cue/1/25/fire\n"
-         "Path:   /cue/%6/start\n"
-         "Output: /cue/25/start\n"
-         "\n"
-         "Ex: Remap path to argument\n"
-         "Input:  /cue/25/start\n"
-         "Path:   /eos/cue/fire=%2\n"
-         "Output: /eos/cue/fire, 25(i)\n"
-         "\n"
-         "Ex: Remap argument to path\n"
-         "Input:  /eos/cue/fire, 25(i)\n"
-         "Path:   /eos/%4/start\n"
-         "Output: /cue/25/start\n"
-         "\n"
-         "Ex: PSN to OSC\n"
-         "Input:  /psn/1/pos, 10(f), 20(f), 30(f)\n"
-         "Path:   /eos/chan/%2/param/x_focus/y_focus/z_focus=%4,%5,%6\n"
-         "Output: /eos/chan/1/param/param/x_focus/y_focus/z_focus, 10(f), 20(f), 30(f)\n"
-         "\n"
-         "Ex: OSC to PSN\n"
-         "Input:  /hoist/xyz, 10(f), 20(f), 30(f)\n"
-         "Path:   /psn/1/pos=%3,%4,%5\n"
-         "Output: PSN packet: tracker id 1, pos(10, 20, 30)");
   row.outPath = new QLineEdit(m_Cols->widget(col));
-  row.outPath->setToolTip(tip);
   row.outPath->setText(dst.path);
 
   row.outScriptText = new ScriptEdit(m_Cols->widget(col));
-  tip =
-      tr("JavaScript Variables:\n--------------------\n"
-         "OSC = outgoing osc path (string)\n"
-         "ARGS = array of osc arguments\n"
-         "\n"
-         "Write your own JavaScript to modify the OSC and ARGS variables\n"
-         "\n"
-         "Ex:\n"
-         "// modify outgoing osc fader from percent to 8-bit value:\n"
-         "OSC = OSC + \"/level\";\n"
-         "ARGS[0] = Math.round(ARGS[0] * 255);");
-  row.outScriptText->setToolTip(tip);
   row.outScriptText->hide();
   row.outScriptText->setText(dst.scriptText);
   row.outScriptText->CheckForErrors();
@@ -1205,6 +1170,9 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const E
   AddCol(col++, row.addRemove, /*fixed*/ true);
 
   m_Rows.push_back(row);
+
+  onInProtocolChanged(m_Rows.size() - 1, src.protocol);
+  onOutProtocolChanged(m_Rows.size() - 1, dst.protocol);
 }
 
 void RoutingWidget::AddCol(int index, QWidget* w, bool fixed /*= false*/)
@@ -1455,7 +1423,7 @@ void RoutingWidget::UpdateLayout()
 {
   bool b = m_Cols->blockSignals(true);
   int y = m_Incoming->sizeHint().height() + static_cast<int>(RoutingCol::Constants::kSpacing);
-  y += m_Headers[0]->sizeHint().height() + static_cast<int>(RoutingCol::Constants::kSpacing);
+  y += m_Headers[static_cast<int>(Col::kInPath)]->sizeHint().height() + static_cast<int>(RoutingCol::Constants::kSpacing);
 
   m_Scroll->setGeometry(static_cast<int>(RoutingCol::Constants::kSpacing), y, width() - static_cast<int>(RoutingCol::Constants::kSpacing) * 2, height() - y);
 
@@ -1507,7 +1475,7 @@ void RoutingWidget::updateHeaders()
   for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
   {
     QRect r = RectForCol(static_cast<Col>(i));
-    m_Headers[i]->setGeometry(r.x(), y, r.width(), m_Headers[0]->sizeHint().height());
+    m_Headers[i]->setGeometry(r.x(), y, r.width(), m_Headers[static_cast<int>(Col::kInPath)]->sizeHint().height());
   }
 
   update();
@@ -1553,10 +1521,17 @@ void RoutingWidget::onAddRemoveClicked(size_t id)
 
 void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
 {
-  if (row >= m_Rows.size() || protocol != Protocol::kPSN)
+  if (row >= m_Rows.size())
     return;
 
   const Row& r = m_Rows[row];
+  r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, /*script*/ false));
+  r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, /*script*/ false));
+  r.inPath->setEnabled(protocol != Protocol::ksACN);
+
+  if (protocol != Protocol::kPSN)
+    return;
+
   if (r.inIP->text().isEmpty())
     r.inIP->setText(QLatin1String(",") + Router::GetDefaultPSNIP());
   if (r.inPort->text().isEmpty())
@@ -1565,14 +1540,43 @@ void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
 
 void RoutingWidget::onOutProtocolChanged(size_t row, Protocol protocol)
 {
-  if (row >= m_Rows.size() || protocol != Protocol::kPSN)
+  if (row >= m_Rows.size())
     return;
 
   const Row& r = m_Rows[row];
+  r.outPort->setToolTip(GetHelpText(Col::kOutPort, protocol, /*script*/ false));
+  r.outPath->setToolTip(GetHelpText(Col::kOutPath, protocol, /*script*/ false));
+  r.outScriptText->setToolTip(GetHelpText(Col::kOutPath, protocol, /*script*/ true));
+
+  if (protocol != Protocol::kPSN)
+    return;
+
   if (r.outIP->text().isEmpty())
     r.outIP->setText(QLatin1String(",") + Router::GetDefaultPSNIP());
   if (r.outPort->text().isEmpty())
     r.outPort->setText(QString::number(Router::GetDefaultPSNPort()));
+}
+
+void RoutingWidget::onHeaderHelpClicked(size_t id)
+{
+  if (!m_Help.dialog)
+  {
+    m_Help.dialog = new QWidget(this, Qt::Tool);
+    QGridLayout* layout = new QGridLayout(m_Help.dialog);
+    layout->setContentsMargins(QMargins());
+    m_Help.edit = new QTextEdit(m_Help.dialog);
+    m_Help.edit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    m_Help.edit->setWordWrapMode(QTextOption::NoWrap);
+    layout->addWidget(m_Help.edit);
+    m_Help.edit->setReadOnly(true);
+  }
+
+  m_Help.edit->setText(GetHelpText(static_cast<Col>(id), /*protocol*/ std::nullopt, /*script*/ true));
+  m_Help.edit->document()->adjustSize();
+  m_Help.dialog->resize(m_Help.edit->document()->size().toSize() + QSize(20, 20));
+
+  m_Help.dialog->show();
+  m_Help.dialog->activateWindow();
 }
 
 void RoutingWidget::StringToTransform(const QString& str, EosRouteDst::sTransform& transform)
@@ -1604,6 +1608,197 @@ bool RoutingWidget::HasRoute(const Router::ROUTES& routes, const EosRouteSrc& sr
   }
 
   return false;
+}
+
+QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bool script)
+{
+  QString text;
+
+  switch (col)
+  {
+    case Col::kInPort:
+    {
+      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+        text = tr("Route sACN levels received on this sACN universe (REQUIRED)");
+      else
+        text = tr("Route packets received on this port (REQUIRED)");
+    }
+    break;
+
+    case Col::kInPath:
+    {
+      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+      {
+        text = tr("Not used for incoming sACN");
+      }
+      else
+      {
+        text =
+            tr("Only route received OSC commands with this specific OSC command path\n"
+               "(use * for wildcard matching, ex: /eos/out/event/*)\n"
+               "\n"
+               "Leave blank to route received packets with any OSC command path (or non-OSC packets)");
+      }
+
+      if (!protocol.has_value())
+      {
+        text +=
+            tr("\n\n"
+               "Incoming sACN:\n"
+               "  Port is the sACN universe\n"
+               "  Path is not used");
+      }
+
+      if (protocol.value_or(Protocol::kPSN) == Protocol::kPSN)
+      {
+        text +=
+            tr("\n\n"
+               "Incoming PSN:\n"
+               "  Individual:\n"
+               "    /psn/<id>/pos=x,y,z\n"
+               "    /psn/<id>/speed=x,y,z\n"
+               "    /psn/<id>/orientation=x,y,z\n"
+               "    /psn/<id>/acceleration=x,y,z\n"
+               "    /psn/<id>/target=x,y,z\n"
+               "    /psn/<id>/status=status\n"
+               "    /psn/<id>/timestamp=timestamp\n"
+               "  Unified:\n"
+               "    /psn/<id>/pos/speed/orientation/acceleration/...");
+      }
+
+      if (protocol.has_value())
+      {
+        text +=
+            tr("\n\n"
+               "Click the [?] button for advanced examples & options");
+      }
+    }
+    break;
+
+    case Col::kOutPort:
+    {
+      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+      {
+        text =
+            tr("Route recevied packets to this outgoing sACN universe\n"
+               "\n"
+               "Leave blank to route packets to the same universe/port they were received on");
+      }
+      else
+      {
+        text =
+            tr("Route received packets to this port\n"
+               "\n"
+               "Leave blank to route packets to the same port they were received on");
+      }
+    }
+    break;
+
+    case Col::kOutPath:
+    {
+      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+        text = tr("Route received packets to this outgoing sACN universe");
+      else
+        text = tr("Route received packets to this OSC command");
+
+      text +=
+          tr("\n\n"
+             "Use %1, %2, %3, etc... to insert specific sections from the received OSC command");
+
+      if (protocol.value_or(Protocol::kOSC) == Protocol::kOSC)
+      {
+        text +=
+            tr("\n\n"
+               "Ex: Remap path\n"
+               "Input:  /eos/out/event/cue/1/25/fire\n"
+               "Path:   /cue/%6/start\n"
+               "Output: /cue/25/start\n"
+               "\n"
+               "Ex: Remap path to argument\n"
+               "Input:  /cue/25/start\n"
+               "Path:   /eos/cue/fire=%2\n"
+               "Output: /eos/cue/fire, 25(i)\n"
+               "\n"
+               "Ex: Remap argument to path\n"
+               "Input:  /eos/cue/fire, 25(i)\n"
+               "Path:   /eos/%4/start\n"
+               "Output: /cue/25/start");
+      }
+
+      if (protocol.value_or(Protocol::ksACN) == Protocol::ksACN)
+      {
+        text +=
+            tr("\n\n"
+               "Outgoing sACN:\n"
+               "  /sacn=a,b,c,...\n"
+               "  /sacn/offset/<number>=a,b,c,...\n"
+               "  /sacn/priority/<number>=a,b,c,...\n"
+               "  /sacn/perChannelPriority/<number>=a,b,c,...\n"
+               "\n"
+               "Ex: sACN to OSC\n"
+               "Input:  <sACN universe levels: %1 - %512>\n"
+               "Path:   /eos/chan/1/param/red/green/blue=%10,%11,%12\n"
+               "Output: /eos/chan/1/param/red/green/blue, 255(f), 0(f), 127(f)\n"
+               "\n"
+               "Ex: OSC to sACN\n"
+               "Input:  /rgb/255/0/127\n"
+               "Path:   /sacn/offset/10=%2,%3,%4\n"
+               "Output: sACN output universe: 10=255, 11=0, 12=127");
+      }
+
+      if (protocol.value_or(Protocol::kPSN) == Protocol::kPSN)
+      {
+        text +=
+            tr("\n\n"
+               "Outgoing PSN:\n"
+               "  Individual:\n"
+               "    /psn/<id>/pos=x,y,z\n"
+               "    /psn/<id>/speed=x,y,z\n"
+               "    /psn/<id>/orientation=x,y,z\n"
+               "    /psn/<id>/acceleration=x,y,z\n"
+               "    /psn/<id>/target=x,y,z\n"
+               "    /psn/<id>/status=status\n"
+               "    /psn/<id>/timestamp=timestamp\n"
+               "  Unified:\n"
+               "    /psn/<id>/pos/speed/orientation/acceleration/...\n"
+               "\n"
+               "Ex: PSN to OSC\n"
+               "Input:  /psn/1/pos, 10(f), 20(f), 30(f)\n"
+               "Path:   /eos/chan/%2/param/x_focus/y_focus/z_focus=%4,%5,%6\n"
+               "Output: /eos/chan/1/param/x_focus/y_focus/z_focus, 10(f), 20(f), 30(f)\n"
+               "\n"
+               "Ex: OSC to PSN\n"
+               "Input:  /hoist/xyz, 10(f), 20(f), 30(f)\n"
+               "Path:   /psn/1/pos=%3,%4,%5\n"
+               "Output: PSN packet: tracker id 1, pos(10, 20, 30)");
+      }
+
+      if (script)
+      {
+        text +=
+            tr("\n\n"
+               "JavaScript Variables:\n--------------------\n"
+               "OSC = outgoing osc path (string)\n"
+               "ARGS = array of osc arguments\n"
+               "\n"
+               "Write your own JavaScript to modify the OSC and ARGS variables\n"
+               "\n"
+               "Ex:\n"
+               "// modify outgoing osc fader from percent to 8-bit value:\n"
+               "OSC = OSC + \"/level\";\n"
+               "ARGS[0] = Math.round(ARGS[0] * 255);");
+      }
+
+      if (protocol.has_value())
+      {
+        text +=
+            tr("\n\n"
+               "Click the [?] button for advanced examples & options");
+      }
+    }
+  }
+
+  return text;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

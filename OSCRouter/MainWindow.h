@@ -319,6 +319,7 @@ private slots:
   void onAddRemoveClicked(size_t id);
   void onInProtocolChanged(size_t row, Protocol protocol);
   void onOutProtocolChanged(size_t row, Protocol protocol);
+  void onHeaderHelpClicked(size_t id);
 
 private:
   enum class Col
@@ -379,15 +380,22 @@ private:
     RoutingButton* addRemove = nullptr;
   };
 
+  struct HelpDialog
+  {
+    QWidget* dialog = nullptr;
+    QTextEdit* edit = nullptr;
+  };
+
   typedef std::vector<Row> Rows;
   typedef std::map<EosAddr, ItemStateTable::ID> AddrStates;
 
   Rows m_Rows;
   QLabel* m_Incoming = nullptr;
   QLabel* m_Outgoing = nullptr;
-  QLabel* m_Headers[static_cast<int>(Col::kCount)];
+  QWidget* m_Headers[static_cast<int>(Col::kCount)];
   QScrollArea* m_Scroll = nullptr;
   QSplitter* m_Cols = nullptr;
+  HelpDialog m_Help;
 
   void LoadLine(const QString& line, Router::ROUTES& routes);
   void AddRow(size_t id, bool remove, const QString& label, const EosRouteSrc& src, const EosRouteDst& dst);
@@ -399,6 +407,7 @@ private:
 
   static QString HeaderForCol(Col col);
   static bool HasRoute(const Router::ROUTES& routes, const EosRouteSrc& src, const EosRouteDst& dst);
+  static QString GetHelpText(Col col, std::optional<Protocol> protocol, bool script);
 };
 
 ////////////////////////////////////////////////////////////////////////////////

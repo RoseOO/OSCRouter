@@ -1818,7 +1818,7 @@ bool RouterThread::SendsACN(sACN &sacn, const EosRouteDst &dst, EosPacket &osc)
           QStringList parts = path.split(QLatin1Char('/'));
           for (int part = 0; part < parts.size(); ++part)
           {
-            if (parts[part] == QLatin1String("sacn"))
+            if (parts[part] == QLatin1String("offset"))
             {
               int numberPart = part + 1;
               if (numberPart < parts.size())
@@ -2044,13 +2044,16 @@ bool RouterThread::ApplyTransform(OSCArgument &arg, const EosRouteDst &dst, OSCP
 
 void RouterThread::MakeSendPath(const EosAddr &addr, Protocol protocol, const QString &srcPath, const QString &dstPath, const OSCArgument *args, size_t argsCount, QString &sendPath)
 {
-  if (dstPath.isEmpty())
+  if (dstPath.isEmpty() && protocol != Protocol::ksACN)
   {
     sendPath = srcPath;
   }
   else
   {
     sendPath = dstPath;
+
+    if (sendPath.isEmpty() && protocol == Protocol::ksACN)
+      sendPath = QStringLiteral("/sacn=%1");
 
     if (dstPath.contains('%'))
     {

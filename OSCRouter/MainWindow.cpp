@@ -441,6 +441,9 @@ void Splitter::autoSize(SplitterHandle* splitterHandle)
 
     setSizes(defaults);
   }
+
+  // update headers
+  emit splitterMoved(0, 0);
 }
 
 QSplitterHandle* Splitter::createHandle()
@@ -1162,9 +1165,9 @@ void RoutingWidget::LoadRoutes(const Router::ROUTES& routes, const ItemStateTabl
 
   AddRow(id++, /*remove*/ false, QString(), Router::sRoute());
 
-  UpdateLayout();
-
   m_Cols->autoSize(nullptr);
+
+  UpdateLayout();
 }
 
 void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const Router::sRoute& route)

@@ -496,6 +496,8 @@ protected:
   virtual bool ApplyTransform(OSCArgument &arg, const EosRouteDst &dst, OSCPacketWriter &packet);
   virtual void MakeSendPath(const EosAddr &addr, Protocol protocol, const QString &srcPath, const QString &dstPath, const OSCArgument *args, size_t argsCount, QString &sendPath);
   virtual void UpdateLog();
+  virtual bool IsOutputEnabled();
+  virtual bool IsRouteEnabled(ItemStateTable::ID id);
   virtual void SetItemState(ItemStateTable::ID id, ItemState::EnumState state);
   virtual void SetItemState(const ROUTES_BY_IP &routesByIp, ItemState::EnumState state);
   virtual void SetItemState(const ROUTES_BY_PATH &routesByPath, ItemState::EnumState state);

@@ -1455,22 +1455,25 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
   }
 
   // send to matching ports
-  ROUTES_BY_PORT::const_iterator portsIter = routesByPort.find(addr.port);
-  if (portsIter != routesByPort.end())
+  if (IsOutputEnabled())
   {
-    const ROUTES_BY_IP &routesByIp = portsIter->second;
-
-    // send to matching ips
-    ROUTES_BY_IP::const_iterator ipIter = routesByIp.find(recvPacket.ip);
-    if (ipIter != routesByIp.end())
-      AddRoutingDestinations(protocol == Protocol::kOSC, path, ipIter->second, routingDestinationList);
-
-    // send to unspecified ips
-    if (recvPacket.ip != 0)
+    ROUTES_BY_PORT::const_iterator portsIter = routesByPort.find(addr.port);
+    if (portsIter != routesByPort.end())
     {
-      ipIter = routesByIp.find(0);
+      const ROUTES_BY_IP &routesByIp = portsIter->second;
+
+      // send to matching ips
+      ROUTES_BY_IP::const_iterator ipIter = routesByIp.find(recvPacket.ip);
       if (ipIter != routesByIp.end())
         AddRoutingDestinations(protocol == Protocol::kOSC, path, ipIter->second, routingDestinationList);
+
+      // send to unspecified ips
+      if (recvPacket.ip != 0)
+      {
+        ipIter = routesByIp.find(0);
+        if (ipIter != routesByIp.end())
+          AddRoutingDestinations(protocol == Protocol::kOSC, path, ipIter->second, routingDestinationList);
+      }
     }
   }
 
@@ -1490,6 +1493,8 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
       for (ROUTE_DESTINATIONS::const_iterator j = destinations.begin(); j != destinations.end(); j++)
       {
         const sRouteDst &routeDst = *j;
+        if (!IsRouteEnabled(routeDst.dstItemStateTableId))
+          continue;
 
         EosAddr dstAddr(routeDst.dst.addr);
         if (dstAddr.ip.isEmpty())
@@ -2175,6 +2180,29 @@ void RouterThread::UpdateLog()
   m_Mutex.unlock();
 
   m_PrivateLog.Clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool RouterThread::IsOutputEnabled()
+{
+  m_Mutex.lock();
+  bool muted = m_ItemStateTable.GetMuteAllOutgoing();
+  m_Mutex.unlock();
+
+  return !muted;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool RouterThread::IsRouteEnabled(ItemStateTable::ID id)
+{
+  m_Mutex.lock();
+  const ItemState *itemState = m_ItemStateTable.GetItemState(id);
+  bool muted = (itemState && itemState->mute);
+  m_Mutex.unlock();
+
+  return !muted;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

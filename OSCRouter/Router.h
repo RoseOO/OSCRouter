@@ -365,7 +365,7 @@ public:
   virtual ~RouterThread();
 
   virtual void Stop();
-  virtual void Flush(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable);
+  virtual void Sync(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable);
 
 protected:
   struct sRouteDst

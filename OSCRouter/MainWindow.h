@@ -511,7 +511,7 @@ private:
   bool SaveFile(const QString& path);
   void InitLogFile();
   void ShutdownLogFile();
-  void FlushRouterThread(bool logsOnly);
+  void SyncRouterThread(bool logsOnly);
   bool Load(const QString& path);
   bool Save(const QString& path);
   bool ResolveUnsaved();

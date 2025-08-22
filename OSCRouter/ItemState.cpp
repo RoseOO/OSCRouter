@@ -106,7 +106,7 @@ void ItemStateTable::Deactivate()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void ItemStateTable::Flush(ItemStateTable &other)
+void ItemStateTable::Sync(ItemStateTable &other)
 {
   if (other.m_Dirty)
   {

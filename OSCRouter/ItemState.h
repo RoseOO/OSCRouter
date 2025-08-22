@@ -73,7 +73,7 @@ public:
   virtual void Clear();
   virtual void Reset();
   virtual void Deactivate();
-  virtual void Flush(ItemStateTable &other);
+  virtual void Sync(ItemStateTable &other);
   virtual bool GetDirty() const { return m_Dirty; }
   virtual ID Register();
   virtual void Update(ID id, const ItemState &state);

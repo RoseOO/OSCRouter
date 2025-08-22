@@ -1066,11 +1066,11 @@ void RouterThread::Stop()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::Flush(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable)
+void RouterThread::Sync(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable)
 {
   m_Mutex.lock();
   m_Log.Flush(logQ);
-  itemStateTable.Flush(m_ItemStateTable);
+  itemStateTable.Sync(m_ItemStateTable);
   m_Mutex.unlock();
 }
 

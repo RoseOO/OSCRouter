@@ -2069,7 +2069,7 @@ void MainWindow::Shutdown()
   if (m_RouterThread)
   {
     m_RouterThread->Stop();
-    FlushRouterThread(/*logsOnly*/ true);
+    SyncRouterThread(/*logsOnly*/ true);
     delete m_RouterThread;
     m_RouterThread = 0;
 
@@ -2257,11 +2257,11 @@ void MainWindow::RestoreLastFile()
   }
 }
 
-void MainWindow::FlushRouterThread(bool logsOnly)
+void MainWindow::SyncRouterThread(bool logsOnly)
 {
   if (m_RouterThread)
   {
-    m_RouterThread->Flush(m_TempLogQ, m_ItemStateTable);
+    m_RouterThread->Sync(m_TempLogQ, m_ItemStateTable);
     m_Log.AddQ(m_TempLogQ);
   }
 
@@ -2282,7 +2282,7 @@ void MainWindow::FlushRouterThread(bool logsOnly)
 
 void MainWindow::onTick()
 {
-  FlushRouterThread(/*logsOnly*/ false);
+  SyncRouterThread(/*logsOnly*/ false);
 }
 
 void MainWindow::buildRoutes()

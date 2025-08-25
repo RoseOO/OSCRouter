@@ -28,16 +28,6 @@ const ItemStateTable::ID ItemStateTable::sm_Invalid_Id = static_cast<ItemStateTa
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool ItemState::operator==(const ItemState &other) const
-{
-  return (state == other.state && activity == other.activity);
-}
-
-bool ItemState::operator!=(const ItemState &other) const
-{
-  return (state != other.state || activity != other.activity);
-}
-
 void ItemState::GetStateName(EnumState state, QString &name)
 {
   switch (state)
@@ -68,14 +58,14 @@ void ItemState::GetStateColor(EnumState state, QColor &color)
 void ItemStateTable::Clear()
 {
   m_List.clear();
-  m_Dirty = false;
+  m_Dirty = m_MuteDirty = false;
 }
 
 void ItemStateTable::Reset()
 {
   for (LIST::iterator i = m_List.begin(); i != m_List.end(); i++)
     i->activity = i->dirty = false;
-  m_Dirty = false;
+  m_Dirty = m_MuteDirty = false;
 }
 
 void ItemStateTable::Deactivate()
@@ -107,12 +97,12 @@ void ItemStateTable::Sync(ItemStateTable &other)
   other.m_MuteAllIncoming = m_MuteAllIncoming;
   other.m_MuteAllOutgoing = m_MuteAllOutgoing;
 
-  if (m_Dirty)
+  if (m_MuteDirty)
   {
     for (size_t i = 0; i < count; i++)
       other.m_List[i].mute = m_List[i].mute;
 
-    m_Dirty = false;
+    m_MuteDirty = false;
   }
 }
 
@@ -124,16 +114,17 @@ ItemStateTable::ID ItemStateTable::Register(bool mute)
   return (m_List.size() - 1);
 }
 
-void ItemStateTable::Update(ID id, const ItemState &state)
+void ItemStateTable::Update(ID id, const ItemState &other)
 {
   if (id >= m_List.size())
     return;
 
   ItemState &itemState = m_List[id];
-  if (itemState == state)
+  if (itemState.state == other.state && itemState.activity == other.activity)
     return;
 
-  itemState = state;
+  itemState.state = other.state;
+  itemState.activity = other.activity;
   itemState.dirty = true;
   m_Dirty = true;
 }
@@ -148,7 +139,7 @@ void ItemStateTable::Mute(ID id, bool b)
     return;
 
   itemState.mute = b;
-  m_Dirty = true;
+  m_MuteDirty = true;
 }
 
 const ItemState *ItemStateTable::GetItemState(ID id) const

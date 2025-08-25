@@ -44,9 +44,6 @@ public:
 
   ItemState() = default;
 
-  bool operator==(const ItemState &other) const;
-  bool operator!=(const ItemState &other) const;
-
   EnumState state = STATE_UNINITIALIZED;
   bool activity = false;
   bool mute = false;
@@ -72,7 +69,7 @@ public:
   virtual void Sync(ItemStateTable &other);
   virtual bool GetDirty() const { return m_Dirty; }
   virtual ID Register(bool mute);
-  virtual void Update(ID id, const ItemState &state);
+  virtual void Update(ID id, const ItemState &other);
   virtual bool GetMuteAllIncoming() const { return m_MuteAllIncoming; }
   virtual void SetMuteAllIncoming(bool b) { m_MuteAllIncoming = b; }
   virtual bool GetMuteAllOutgoing() const { return m_MuteAllOutgoing; }
@@ -88,6 +85,7 @@ private:
   bool m_MuteAllOutgoing = false;
   LIST m_List;
   bool m_Dirty = false;
+  bool m_MuteDirty = false;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

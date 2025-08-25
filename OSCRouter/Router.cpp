@@ -2769,7 +2769,7 @@ void RouterThread::UniverseData(const CID &source, const char * /*source_name*/,
       char ipStr[CIPAddr::ADDRSTRINGBYTES];
       CIPAddr::AddrIntoString(source_ip, ipStr, /*showport*/ false, /*showint*/ false);
 
-      m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 source appeared: %2 priority: %3 ip: %4").arg(universe).arg(cidStr).arg(priority).arg(ipStr).toUtf8().constData());
+      m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 source appeared: %2 priority: %3, ip: %4").arg(universe).arg(cidStr).arg(priority).arg(ipStr).toUtf8().constData());
     }
     else
     {
@@ -2777,7 +2777,7 @@ void RouterThread::UniverseData(const CID &source, const char * /*source_name*/,
       {
         char str[CID::CIDSTRINGBYTES];
         CID::CIDIntoString(source, str);
-        m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 source priority changed: %2 priority: %3 -> %4").arg(universe).arg(str).arg(recvUniverse.priority).arg(priority).toUtf8().constData());
+        m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 source priority changed: %2, priority: %3 -> %4").arg(universe).arg(str).arg(recvUniverse.priority).arg(priority).toUtf8().constData());
       }
 
       if (recvUniverse.ip != recvSource.ip)
@@ -2793,7 +2793,7 @@ void RouterThread::UniverseData(const CID &source, const char * /*source_name*/,
         char ipStrNew[CIPAddr::ADDRSTRINGBYTES];
         CIPAddr::AddrIntoString(source_ip, ipStrNew, /*showport*/ false, /*showint*/ false);
 
-        m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 source ip changed: %2 priority: %3 -> %4").arg(universe).arg(cidStr).arg(ipStrOld).arg(ipStrNew).toUtf8().constData());
+        m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 source ip changed: %2, ip: %3 -> %4").arg(universe).arg(cidStr).arg(ipStrOld).arg(ipStrNew).toUtf8().constData());
       }
     }
 
@@ -2806,8 +2806,10 @@ void RouterThread::UniverseData(const CID &source, const char * /*source_name*/,
   }
   else if (start_code == STARTCODE_PRIORITY)
   {
-    if (result.second)
+    if (result.second || !recvUniverse.hasPerChannelPriority)
     {
+      recvUniverse.channelPriority.fill(0);
+
       char cidStr[CID::CIDSTRINGBYTES];
       CID::CIDIntoString(source, cidStr);
 
@@ -2816,6 +2818,21 @@ void RouterThread::UniverseData(const CID &source, const char * /*source_name*/,
 
       m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 per channel priority source appeared: %2 ip: %3").arg(universe).arg(cidStr).arg(ipStr).toUtf8().constData());
     }
+    else if (recvUniverse.ip != recvSource.ip)
+    {
+      char cidStr[CID::CIDSTRINGBYTES];
+      CID::CIDIntoString(source, cidStr);
+
+      char ipStrOld[CIPAddr::ADDRSTRINGBYTES];
+      CIPAddr old_addr;
+      old_addr.SetV4Address(recvUniverse.ip);
+      CIPAddr::AddrIntoString(old_addr, ipStrOld, /*showport*/ false, /*showint*/ false);
+
+      char ipStrNew[CIPAddr::ADDRSTRINGBYTES];
+      CIPAddr::AddrIntoString(source_ip, ipStrNew, /*showport*/ false, /*showint*/ false);
+
+      m_sACNRecv.log.AddInfo(QStringLiteral("sACN universe %1 per channel priority ip changed: %2, ip: %3 -> %4").arg(universe).arg(cidStr).arg(ipStrOld).arg(ipStrNew).toUtf8().constData());
+    }
 
     recvUniverse.hasPerChannelPriority = true;
     recvUniverse.ip = recvSource.ip;
@@ -2823,8 +2840,6 @@ void RouterThread::UniverseData(const CID &source, const char * /*source_name*/,
 
     if (slot_count != 0 && pdata)
       memcpy(recvUniverse.channelPriority.data(), pdata, std::min(recvUniverse.channelPriority.size(), static_cast<size_t>(slot_count)));
-    else if (result.second)
-      recvUniverse.channelPriority.fill(0);
   }
 }
 

@@ -130,6 +130,7 @@ public:
   struct sRoute
   {
     sRoute() {}
+    bool enable = true;
     bool mute = false;
     QString label;
     EosRouteSrc src;

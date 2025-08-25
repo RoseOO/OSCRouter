@@ -406,8 +406,13 @@ void MuteCheckBox::paintEvent(QPaintEvent* /*event*/)
 {
   QPainter painter(this);
 
-  if (underMouse())
-    painter.fillRect(rect(), palette().color(QPalette::Window).lighter());
+  if (isEnabled())
+  {
+    if (underMouse())
+      painter.fillRect(rect(), palette().color(QPalette::Window).lighter());
+  }
+  else
+    painter.setOpacity(0.25);
 
   static QIcon iconUnchecked(QLatin1String(":/qt/etc/NetworkOn.svg"));
   static QIcon iconChecked(QLatin1String(":/qt/etc/NetworkOff.svg"));
@@ -1179,6 +1184,8 @@ QString RoutingWidget::HeaderForCol(Col col)
 {
   switch (col)
   {
+    case Col::kEnable: return tr("On");
+
     case Col::kMute: return tr("Mute");
 
     case Col::kLabel: return tr("Name");
@@ -1229,6 +1236,7 @@ void RoutingWidget::LoadRoutes(const Router::ROUTES& routes, const ItemStateTabl
   m_Cols->autoSize(nullptr);
 
   UpdateLayout();
+  UpdateEnableState();
   UpdateMuteState();
 }
 
@@ -1238,6 +1246,12 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
 
   Row row;
   row.id = id;
+
+  row.enable = new RoutingCheckBox(id, m_Cols->widget(col));
+  row.enable->setToolTip(tr("Enable this route"));
+  row.enable->setChecked(route.enable);
+  connect(row.enable, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onEnableToggled);
+  AddCol(col++, row.enable, /*fixed*/ true);
 
   row.mute = new MuteCheckBox(id, m_Cols->widget(col));
   row.mute->setToolTip(tr("Temporarily mute running route"));
@@ -1286,6 +1300,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   row.inPath = new LineEdit(m_Cols->widget(col));
   row.inPath->setText(route.src.path);
   int fh = row.inPath->sizeHint().height();
+  row.enable->setFixedHeight(fh);
   row.mute->setFixedHeight(fh);
   row.inState->setFixedHeight(fh);
   row.inActivity->setFixedHeight(fh);
@@ -1472,7 +1487,10 @@ void RoutingWidget::LoadLine(const QString& line, Router::ROUTES& routes, ItemSt
       route.dst.protocol = ProtocolComboBox::SanitizedProtocol(items[14].toInt());
 
     if (items.size() > 15)
-      route.mute = (items[15].toInt() == 0);
+      route.enable = (items[15].toInt() != 0);
+
+    if (items.size() > 16)
+      route.mute = (items[16].toInt() == 0);
 
     routes.push_back(route);
   }
@@ -1519,6 +1537,7 @@ void RoutingWidget::Save(QTextStream& stream)
     stream << QStringLiteral(",%1").arg(FileUtils::QuotedString(route.src.multicastIP));
     stream << QStringLiteral(",%1").arg(static_cast<int>(route.src.protocol));
     stream << QStringLiteral(",%1").arg(static_cast<int>(route.dst.protocol));
+    stream << QStringLiteral(",%1").arg(route.enable ? 1 : 0);
     stream << QStringLiteral(",%1").arg(route.mute ? 0 : 1);
     stream << QLatin1Char('\n');
   }
@@ -1546,6 +1565,7 @@ void RoutingWidget::SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemState
     if (route.src.addr.port == 0)
       continue;  // port required
 
+    route.enable = row.enable->isChecked();
     route.mute = row.mute->isChecked();
     route.label = row.label->text();
 
@@ -1737,6 +1757,36 @@ void SetMuted(QWidget* w, bool b)
   w->setPalette(pal);
 }
 
+void RoutingWidget::UpdateEnableState()
+{
+  for (size_t i = 0; i < m_Rows.size(); ++i)
+  {
+    Row& row = m_Rows[i];
+
+    bool e = row.enable->isChecked();
+
+    row.mute->setEnabled(e);
+    row.label->setEnabled(e);
+    row.inIP->setEnabled(e);
+    row.inPort->setEnabled(e);
+    row.inProtocol->setEnabled(e);
+    row.inPath->setEnabled(e && row.inProtocol->GetProtocol() != Protocol::ksACN);
+    row.inMin->setEnabled(e);
+    row.inMax->setEnabled(e);
+
+    row.divider->setEnabled(e);
+
+    row.outIP->setEnabled(e);
+    row.outPort->setEnabled(e);
+    row.outProtocol->setEnabled(e);
+    row.outPath->setEnabled(e);
+    row.outScriptText->setEnabled(e);
+    row.outScript->setEnabled(e);
+    row.outMin->setEnabled(e);
+    row.outMax->setEnabled(e);
+  }
+}
+
 void RoutingWidget::UpdateMuteState()
 {
   bool muteAllIncoming = m_Incoming.mute->isChecked();
@@ -1765,6 +1815,11 @@ void RoutingWidget::UpdateMuteState()
     SetMuted(row.outMin, mute);
     SetMuted(row.outMax, mute);
   }
+}
+
+void RoutingWidget::onEnableToggled(size_t /*id*/, bool /*checked*/)
+{
+  UpdateEnableState();
 }
 
 void RoutingWidget::onOutScriptToggled(size_t id, bool checked)
@@ -1817,7 +1872,7 @@ void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
   const Row& r = m_Rows[row];
   r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, /*script*/ false));
   r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, /*script*/ false));
-  r.inPath->setEnabled(protocol != Protocol::ksACN);
+  r.inPath->setEnabled(r.enable->isChecked() && protocol != Protocol::ksACN);
 
   if (protocol != Protocol::kPSN)
     return;
@@ -1857,6 +1912,9 @@ void RoutingWidget::onHeaderHelpClicked(size_t id)
     m_Help.edit = new QTextEdit(m_Help.dialog);
     m_Help.edit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     m_Help.edit->setWordWrapMode(QTextOption::NoWrap);
+    QPalette pal = m_Help.edit->palette();
+    pal.setColor(QPalette::Base, pal.color(QPalette::Window));
+    m_Help.edit->setPalette(pal);
     layout->addWidget(m_Help.edit);
     m_Help.edit->setReadOnly(true);
   }

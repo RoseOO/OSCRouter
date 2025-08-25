@@ -1155,6 +1155,9 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
     for (Router::ROUTES::const_iterator i = m_Routes.begin(); i != m_Routes.end(); i++)
     {
       Router::sRoute route(*i);
+      if (!route.enable)
+        continue;
+
       QHostAddress srcAddr(route.src.addr.ip);
 
       ROUTES_BY_PORT *routes = &routesByPort;

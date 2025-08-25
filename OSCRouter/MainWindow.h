@@ -384,6 +384,7 @@ signals:
 
 private slots:
   void updateHeaders();
+  void onEnableToggled(size_t, bool checked);
   void onMuteToggled(size_t id, bool checked);
   void onMuteRouteToggled(size_t row, bool checked);
   void onOutScriptToggled(size_t id, bool checked);
@@ -400,7 +401,8 @@ protected:
 private:
   enum class Col
   {
-    kMute = 0,
+    kEnable = 0,
+    kMute,
 
     kLabel,
 
@@ -440,6 +442,7 @@ private:
   {
     size_t id = 0;
     ItemStateTable::ID inItemStateTableId = ItemStateTable::sm_Invalid_Id;
+    RoutingCheckBox* enable = nullptr;
     MuteCheckBox* mute = nullptr;
     LineEdit* label = nullptr;
     Indicator* inState = nullptr;
@@ -489,6 +492,7 @@ private:
   void UpdateItemState(const ItemState* itemState, Indicator& stateIndicator, Indicator& activityIndicator);
   void UpdateLayout();
   QRect RectForCol(Col col) const;
+  void UpdateEnableState();
   void UpdateMuteState();
 
   static QString HeaderForCol(Col col);

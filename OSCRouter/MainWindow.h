@@ -356,13 +356,12 @@ public:
 
 signals:
   void muteToggled(size_t id, bool checked);
-  void routeMuteToggled(size_t id, bool checked);
+  void muteRouteToggled(size_t id, bool checked);
 
 private slots:
   void updateHeaders();
   void onMuteToggled(size_t id, bool checked);
-  void onInMuteToggled(size_t row, bool checked);
-  void onOutMuteToggled(size_t row, bool checked);
+  void onMuteRouteToggled(size_t row, bool checked);
   void onOutScriptToggled(size_t id, bool checked);
   void onAddRemoveClicked(size_t id);
   void onInProtocolChanged(size_t row, Protocol protocol);
@@ -377,9 +376,10 @@ protected:
 private:
   enum class Col
   {
-    kLabel = 0,
+    kMute = 0,
 
-    kInMute,
+    kLabel,
+
     kInState,
     kInActivity,
     kInIP,
@@ -391,7 +391,6 @@ private:
 
     kDivider,
 
-    kOutMute,
     kOutState,
     kOutActivity,
     kOutIP,
@@ -417,8 +416,8 @@ private:
   {
     size_t id = 0;
     ItemStateTable::ID inItemStateTableId = ItemStateTable::sm_Invalid_Id;
+    RoutingCheckBox* mute = nullptr;
     LineEdit* label = nullptr;
-    RoutingCheckBox* inMute = nullptr;
     Indicator* inState = nullptr;
     Indicator* inActivity = nullptr;
     LineEdit* inIP = nullptr;
@@ -429,7 +428,6 @@ private:
     LineEdit* inMax = nullptr;
     QLabel* divider = nullptr;
     ItemStateTable::ID outItemStateTableId = ItemStateTable::sm_Invalid_Id;
-    RoutingCheckBox* outMute = nullptr;
     Indicator* outState = nullptr;
     Indicator* outActivity = nullptr;
     LineEdit* outIP = nullptr;
@@ -502,7 +500,7 @@ private slots:
   void onOpenLog();
   void onApplyClicked(bool checked);
   void onMuteToggled(bool incoming, bool checked);
-  void onRouteMuteToggled(size_t id, bool checked);
+  void onMuteRouteToggled(size_t id, bool checked);
 
 private:
   EosLog m_Log;

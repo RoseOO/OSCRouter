@@ -130,13 +130,12 @@ public:
   struct sRoute
   {
     sRoute() {}
+    bool mute = false;
     QString label;
     EosRouteSrc src;
     ItemStateTable::ID srcItemStateTableId = ItemStateTable::sm_Invalid_Id;
-    bool srcMute = false;
     EosRouteDst dst;
     ItemStateTable::ID dstItemStateTableId = ItemStateTable::sm_Invalid_Id;
-    bool dstMute = false;
   };
 
   typedef std::vector<sRoute> ROUTES;
@@ -200,13 +199,14 @@ public:
   EosUdpInThread();
   virtual ~EosUdpInThread();
 
-  virtual void Start(const EosAddr &addr, QString multicastIP, Protocol protocol, ItemStateTable::ID itemStateTableId, unsigned int reconnectDelayMS);
+  virtual void Start(const EosAddr &addr, QString multicastIP, Protocol protocol, ItemStateTable::ID itemStateTableId, unsigned int reconnectDelayMS, bool mute);
   virtual void Stop();
   const EosAddr &GetAddr() const { return m_Addr; }
   Protocol GetProtocol() const { return m_Protocol; }
   ItemStateTable::ID GetItemStateTableId() const { return m_ItemStateTableId; }
   ItemState::EnumState GetState();
   virtual void Flush(EosLog::LOG_Q &logQ, RECV_Q &recvQ);
+  virtual void Mute(bool b) { m_Mute = b; }
 
 protected:
   EosAddr m_Addr;
@@ -222,6 +222,7 @@ protected:
   QRecursiveMutex m_Mutex;
   psn::psn_decoder *m_PSNDecoder = nullptr;
   std::optional<uint8_t> m_PSNFrame;
+  bool m_Mute;
 
   virtual void run();
   virtual void UpdateLog();
@@ -271,8 +272,8 @@ public:
   EosTcpClientThread();
   virtual ~EosTcpClientThread();
 
-  virtual void Start(const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS);
-  virtual void Start(EosTcp *tcp, const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS);
+  virtual void Start(const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS, bool mute);
+  virtual void Start(EosTcp *tcp, const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS, bool mute);
   virtual void Stop();
   const EosAddr &GetAddr() const { return m_Addr; }
   ItemStateTable::ID GetItemStateTableId() const { return m_ItemStateTableId; }
@@ -280,6 +281,7 @@ public:
   virtual bool Send(const EosPacket &packet);
   virtual bool SendFramed(const EosPacket &packet);
   virtual void Flush(EosLog::LOG_Q &logQ, EosUdpInThread::RECV_Q &recvQ);
+  virtual void Mute(bool b) { m_Mute = b; }
 
 protected:
   EosTcp *m_AcceptedTcp;
@@ -294,6 +296,7 @@ protected:
   EosUdpInThread::RECV_Q m_RecvQ;
   EosPacket::Q m_SendQ;
   QRecursiveMutex m_Mutex;
+  bool m_Mute;
 
   virtual void run();
   virtual void UpdateLog();
@@ -465,6 +468,12 @@ protected:
     QElapsedTimer sendTimer;
   };
 
+  struct MuteAll
+  {
+    bool incoming = false;
+    bool outgoing = false;
+  };
+
   bool m_Run;
   unsigned int m_ReconnectDelay;
   Router::ROUTES m_Routes;
@@ -492,12 +501,12 @@ protected:
   virtual bool MakeOSCPacket(const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet);
   virtual bool MakePSNPacket(EosPacket &osc, EosPacket &psn);
   virtual bool SendsACN(sACN &sacn, const EosRouteDst &dst, EosPacket &osc);
-  virtual void ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ);
+  virtual void ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute);
   virtual bool ApplyTransform(OSCArgument &arg, const EosRouteDst &dst, OSCPacketWriter &packet);
   virtual void MakeSendPath(const EosAddr &addr, Protocol protocol, const QString &srcPath, const QString &dstPath, const OSCArgument *args, size_t argsCount, QString &sendPath);
   virtual void UpdateLog();
-  virtual bool IsOutputEnabled();
-  virtual bool IsRouteEnabled(ItemStateTable::ID id);
+  virtual MuteAll GetMuteAll();
+  virtual bool IsRouteMuted(ItemStateTable::ID id);
   virtual void SetItemState(ItemStateTable::ID id, ItemState::EnumState state);
   virtual void SetItemState(const ROUTES_BY_IP &routesByIp, ItemState::EnumState state);
   virtual void SetItemState(const ROUTES_BY_PATH &routesByPath, ItemState::EnumState state);

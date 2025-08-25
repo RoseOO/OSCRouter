@@ -98,6 +98,7 @@ EosUdpInThread::EosUdpInThread()
   , m_ItemStateTableId(ItemStateTable::sm_Invalid_Id)
   , m_State(ItemState::STATE_UNINITIALIZED)
   , m_ReconnectDelay(0)
+  , m_Mute(false)
 {
 }
 
@@ -110,7 +111,7 @@ EosUdpInThread::~EosUdpInThread()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void EosUdpInThread::Start(const EosAddr &addr, QString multicastIP, Protocol protocol, ItemStateTable::ID itemStateTableId, unsigned int reconnectDelayMS)
+void EosUdpInThread::Start(const EosAddr &addr, QString multicastIP, Protocol protocol, ItemStateTable::ID itemStateTableId, unsigned int reconnectDelayMS, bool mute)
 {
   Stop();
 
@@ -119,6 +120,7 @@ void EosUdpInThread::Start(const EosAddr &addr, QString multicastIP, Protocol pr
   m_Protocol = protocol;
   m_ItemStateTableId = itemStateTableId;
   m_ReconnectDelay = reconnectDelayMS;
+  m_Mute = mute;
   m_Run = true;
   start();
 }
@@ -385,7 +387,7 @@ void EosUdpInThread::run()
         int len = 0;
         int addrSize = static_cast<int>(sizeof(addr));
         const char *data = udpIn->RecvPacket(m_PrivateLog, 100, 0, len, &addr, &addrSize);
-        if (data && len > 0)
+        if (!m_Mute && data && len > 0)
           RecvPacket(QHostAddress(reinterpret_cast<const sockaddr *>(&addr)), data, len, logParser, packetLogger);
 
         UpdateLog();
@@ -610,6 +612,7 @@ EosTcpClientThread::EosTcpClientThread()
   , m_FrameMode(OSCStream::FRAME_MODE_INVALID)
   , m_State(ItemState::STATE_UNINITIALIZED)
   , m_ReconnectDelay(0)
+  , m_Mute(false)
 {
 }
 
@@ -622,14 +625,14 @@ EosTcpClientThread::~EosTcpClientThread()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void EosTcpClientThread::Start(const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS)
+void EosTcpClientThread::Start(const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS, bool mute)
 {
-  Start(0, addr, itemStateTableId, frameMode, reconnectDelayMS);
+  Start(0, addr, itemStateTableId, frameMode, reconnectDelayMS, mute);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void EosTcpClientThread::Start(EosTcp *tcp, const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS)
+void EosTcpClientThread::Start(EosTcp *tcp, const EosAddr &addr, ItemStateTable::ID itemStateTableId, OSCStream::EnumFrameMode frameMode, unsigned int reconnectDelayMS, bool mute)
 {
   Stop();
 
@@ -638,6 +641,7 @@ void EosTcpClientThread::Start(EosTcp *tcp, const EosAddr &addr, ItemStateTable:
   m_ItemStateTableId = itemStateTableId;
   m_FrameMode = frameMode;
   m_ReconnectDelay = reconnectDelayMS;
+  m_Mute = mute;
   m_Run = true;
   start();
 }
@@ -781,7 +785,7 @@ void EosTcpClientThread::run()
           char *frame = recvStream.GetNextFrame(frameSize);
           if (frame)
           {
-            if (frameSize != 0)
+            if (!m_Mute && frameSize != 0)
             {
               inPacketLogger.PrintPacket(logParser, frame, frameSize);
               m_Mutex.lock();
@@ -1071,6 +1075,7 @@ void RouterThread::Sync(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable)
   m_Mutex.lock();
   m_Log.Flush(logQ);
   itemStateTable.Sync(m_ItemStateTable);
+
   m_Mutex.unlock();
 }
 
@@ -1080,6 +1085,8 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
                                TCP_SERVER_THREADS &tcpServerThreads)
 {
   m_PrivateLog.AddInfo("Building Routing Table...");
+
+  bool mute = GetMuteAll().incoming;
 
   // get a list of add network interface addresses
   std::vector<QNetworkAddressEntry> nics;
@@ -1125,7 +1132,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
             {
               EosTcpClientThread *thread = new EosTcpClientThread();
               tcpClientThreads[tcpAddr] = thread;
-              thread->Start(tcpAddr, tcpConnection.itemStateTableId, tcpConnection.frameMode, m_ReconnectDelay);
+              thread->Start(tcpAddr, tcpConnection.itemStateTableId, tcpConnection.frameMode, m_ReconnectDelay, mute);
             }
           }
         }
@@ -1139,7 +1146,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
         {
           EosTcpClientThread *thread = new EosTcpClientThread();
           tcpClientThreads[tcpConnection.addr] = thread;
-          thread->Start(tcpConnection.addr, tcpConnection.itemStateTableId, tcpConnection.frameMode, m_ReconnectDelay);
+          thread->Start(tcpConnection.addr, tcpConnection.itemStateTableId, tcpConnection.frameMode, m_ReconnectDelay, mute);
         }
       }
     }
@@ -1171,7 +1178,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
             {
               EosUdpInThread *thread = new EosUdpInThread();
               udpInThreads[inAddr] = thread;
-              thread->Start(inAddr, route.src.multicastIP, route.src.protocol, route.srcItemStateTableId, m_ReconnectDelay);
+              thread->Start(inAddr, route.src.multicastIP, route.src.protocol, route.srcItemStateTableId, m_ReconnectDelay, mute);
             }
           }
         }
@@ -1455,25 +1462,22 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
   }
 
   // send to matching ports
-  if (IsOutputEnabled())
+  ROUTES_BY_PORT::const_iterator portsIter = routesByPort.find(addr.port);
+  if (portsIter != routesByPort.end())
   {
-    ROUTES_BY_PORT::const_iterator portsIter = routesByPort.find(addr.port);
-    if (portsIter != routesByPort.end())
-    {
-      const ROUTES_BY_IP &routesByIp = portsIter->second;
+    const ROUTES_BY_IP &routesByIp = portsIter->second;
 
-      // send to matching ips
-      ROUTES_BY_IP::const_iterator ipIter = routesByIp.find(recvPacket.ip);
+    // send to matching ips
+    ROUTES_BY_IP::const_iterator ipIter = routesByIp.find(recvPacket.ip);
+    if (ipIter != routesByIp.end())
+      AddRoutingDestinations(protocol == Protocol::kOSC, path, ipIter->second, routingDestinationList);
+
+    // send to unspecified ips
+    if (recvPacket.ip != 0)
+    {
+      ipIter = routesByIp.find(0);
       if (ipIter != routesByIp.end())
         AddRoutingDestinations(protocol == Protocol::kOSC, path, ipIter->second, routingDestinationList);
-
-      // send to unspecified ips
-      if (recvPacket.ip != 0)
-      {
-        ipIter = routesByIp.find(0);
-        if (ipIter != routesByIp.end())
-          AddRoutingDestinations(protocol == Protocol::kOSC, path, ipIter->second, routingDestinationList);
-      }
     }
   }
 
@@ -1493,7 +1497,7 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
       for (ROUTE_DESTINATIONS::const_iterator j = destinations.begin(); j != destinations.end(); j++)
       {
         const sRouteDst &routeDst = *j;
-        if (!IsRouteEnabled(routeDst.dstItemStateTableId))
+        if (IsRouteMuted(routeDst.dstItemStateTableId))
           continue;
 
         EosAddr dstAddr(routeDst.dst.addr);
@@ -1979,7 +1983,7 @@ bool RouterThread::SendsACN(sACN &sacn, const EosRouteDst &dst, EosPacket &osc)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ)
+void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute)
 {
   for (EosTcpServerThread::CONNECTION_Q::const_iterator i = tcpConnectionQ.begin(); i != tcpConnectionQ.end(); i++)
   {
@@ -1996,7 +2000,7 @@ void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, O
 
     EosTcpClientThread *thread = new EosTcpClientThread();
     tcpClientThreads[tcpConnection.addr] = thread;
-    thread->Start(tcpConnection.tcp, tcpConnection.addr, ItemStateTable::sm_Invalid_Id, frameMode, m_ReconnectDelay);
+    thread->Start(tcpConnection.tcp, tcpConnection.addr, ItemStateTable::sm_Invalid_Id, frameMode, m_ReconnectDelay, mute);
   }
 }
 
@@ -2184,25 +2188,28 @@ void RouterThread::UpdateLog()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RouterThread::IsOutputEnabled()
+RouterThread::MuteAll RouterThread::GetMuteAll()
 {
+  MuteAll muteAll;
+
   m_Mutex.lock();
-  bool muted = m_ItemStateTable.GetMuteAllOutgoing();
+  muteAll.incoming = m_ItemStateTable.GetMuteAllIncoming();
+  muteAll.outgoing = m_ItemStateTable.GetMuteAllOutgoing();
   m_Mutex.unlock();
 
-  return !muted;
+  return muteAll;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RouterThread::IsRouteEnabled(ItemStateTable::ID id)
+bool RouterThread::IsRouteMuted(ItemStateTable::ID id)
 {
   m_Mutex.lock();
   const ItemState *itemState = m_ItemStateTable.GetItemState(id);
   bool muted = (itemState && itemState->mute);
   m_Mutex.unlock();
 
-  return !muted;
+  return muted;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2291,16 +2298,21 @@ void RouterThread::run()
 
   while (m_Run)
   {
+    MuteAll muteAll = GetMuteAll();
+
     // sACN input
     RecvsACN(sacn, sACNRecvQ);
 
-    EosAddr sACNAddr;
-    for (size_t i = 0; i < sACNRecvQ.size(); ++i)
+    if (!muteAll.incoming && !muteAll.outgoing)
     {
-      EosUdpInThread::sRecvPortPacket &sACNPacket = sACNRecvQ[i];
-      sACNAddr.fromUInt(sACNPacket.p.ip);
-      sACNAddr.port = sACNPacket.port;
-      ProcessRecvPacket(sacn, routesBysACNUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, sACNAddr, Protocol::ksACN, sACNPacket.p);
+      EosAddr sACNAddr;
+      for (size_t i = 0; i < sACNRecvQ.size(); ++i)
+      {
+        EosUdpInThread::sRecvPortPacket &sACNPacket = sACNRecvQ[i];
+        sACNAddr.fromUInt(sACNPacket.p.ip);
+        sACNAddr.port = sACNPacket.port;
+        ProcessRecvPacket(sacn, routesBysACNUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, sACNAddr, Protocol::ksACN, sACNPacket.p);
+      }
     }
 
     // UDP input
@@ -2308,6 +2320,7 @@ void RouterThread::run()
     {
       EosUdpInThread *thread = i->second;
       bool running = thread->isRunning();
+      thread->Mute(muteAll.incoming);
       thread->Flush(tempLogQ, recvQ);
       m_PrivateLog.AddQ(tempLogQ);
       tempLogQ.clear();
@@ -2316,7 +2329,8 @@ void RouterThread::run()
       if (!recvQ.empty())
         SetItemActivity(thread->GetItemStateTableId());
 
-      ProcessRecvQ(sacn, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
+      if (!muteAll.outgoing)
+        ProcessRecvQ(sacn, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
 
       if (!running)
       {
@@ -2341,7 +2355,7 @@ void RouterThread::run()
       if (!tcpConnectionQ.empty())
       {
         SetItemActivity(thread->GetItemStateTableId());
-        ProcessTcpConnectionQ(tcpClientThreads, thread->GetFrameMode(), tcpConnectionQ);
+        ProcessTcpConnectionQ(tcpClientThreads, thread->GetFrameMode(), tcpConnectionQ, muteAll.incoming);
       }
 
       if (!running)
@@ -2358,6 +2372,7 @@ void RouterThread::run()
     {
       EosTcpClientThread *thread = i->second;
       bool running = thread->isRunning();
+      thread->Mute(muteAll.incoming);
       thread->Flush(tempLogQ, recvQ);
       m_PrivateLog.AddQ(tempLogQ);
       tempLogQ.clear();
@@ -2366,7 +2381,8 @@ void RouterThread::run()
       if (!recvQ.empty())
         SetItemActivity(thread->GetItemStateTableId());
 
-      ProcessRecvQ(sacn, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
+      if (!muteAll.outgoing)
+        ProcessRecvQ(sacn, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
 
       if (!running)
       {
@@ -2404,7 +2420,9 @@ void RouterThread::run()
       {
         if (sacn.sendTimer.elapsed() >= 22)
         {
-          sacn.server->Tick(nullptr, 0);
+          if (!muteAll.outgoing)
+            sacn.server->Tick(nullptr, 0);
+
           sacn.sendTimer.start();
         }
       }

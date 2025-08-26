@@ -3,5 +3,7 @@
   <file>qt.conf</file>
   <file>NetworkOn.svg</file>
   <file>NetworkOff.svg</file>
+  <file>CheckBoxOn.svg</file>
+  <file>CheckBoxOff.svg</file>
 </qresource>
 </RCC>

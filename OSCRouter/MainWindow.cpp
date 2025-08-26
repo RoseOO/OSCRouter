@@ -34,7 +34,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#define APP_VERSION "0.20"
+#define APP_VERSION "0.21"
 #define SETTING_LOG_DEPTH "LogDepth"
 #define SETTING_FILE_DEPTH "FileDepth"
 #define SETTING_LAST_FILE "LastFile"
@@ -368,6 +368,7 @@ RoutingButton::RoutingButton(const QString& text, size_t id, QWidget* parent /*=
 }
 
 void RoutingButton::onClicked(bool /*checked*/)
+
 {
   emit clickedWithId(m_Id);
 }
@@ -375,10 +376,54 @@ void RoutingButton::onClicked(bool /*checked*/)
 ////////////////////////////////////////////////////////////////////////////////
 
 RoutingCheckBox::RoutingCheckBox(size_t id, QWidget* parent /*= nullptr*/)
-  : QCheckBox(parent)
+  : QAbstractButton(parent)
   , m_Id(id)
 {
-  connect(this, &QCheckBox::toggled, this, &RoutingCheckBox::onToggled);
+  Construct();
+}
+
+RoutingCheckBox::RoutingCheckBox(Style checkBoxStyle, size_t id, QWidget* parent /*= nullptr*/)
+  : QAbstractButton(parent)
+  , m_Style(checkBoxStyle)
+  , m_Id(id)
+{
+  Construct();
+}
+
+void RoutingCheckBox::Construct()
+{
+  setCheckable(true);
+  setFixedSize(24, 24);
+  connect(this, &QAbstractButton::toggled, this, &RoutingCheckBox::onToggled);
+}
+
+const QIcon& RoutingCheckBox::GetIcon(Style checkBoxStyle, bool checked)
+{
+  switch (checkBoxStyle)
+  {
+    case Style::Mute:
+    {
+      if (checked)
+      {
+        static QIcon iconChecked(QLatin1String(":/qt/etc/NetworkOff.svg"));
+        return iconChecked;
+      }
+      else
+      {
+        static QIcon iconUnchecked(QLatin1String(":/qt/etc/NetworkOn.svg"));
+        return iconUnchecked;
+      }
+    }
+  }
+
+  if (checked)
+  {
+    static QIcon iconChecked(QLatin1String(":/qt/etc/CheckBoxOn.svg"));
+    return iconChecked;
+  }
+
+  static QIcon iconUnchecked(QLatin1String(":/qt/etc/CheckBoxOff.svg"));
+  return iconUnchecked;
 }
 
 void RoutingCheckBox::onToggled(bool checked)
@@ -386,23 +431,7 @@ void RoutingCheckBox::onToggled(bool checked)
   emit toggledWithId(m_Id, checked);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-MuteCheckBox::MuteCheckBox(size_t id, QWidget* parent /*= nullptr*/)
-  : QAbstractButton(parent)
-  , m_Id(id)
-{
-  setCheckable(true);
-  setFixedSize(24, 24);
-  connect(this, &QAbstractButton::toggled, this, &MuteCheckBox::onToggled);
-}
-
-void MuteCheckBox::onToggled(bool checked)
-{
-  emit toggledWithId(m_Id, checked);
-}
-
-void MuteCheckBox::paintEvent(QPaintEvent* /*event*/)
+void RoutingCheckBox::paintEvent(QPaintEvent* /*event*/)
 {
   QPainter painter(this);
 
@@ -414,12 +443,7 @@ void MuteCheckBox::paintEvent(QPaintEvent* /*event*/)
   else
     painter.setOpacity(0.25);
 
-  static QIcon iconUnchecked(QLatin1String(":/qt/etc/NetworkOn.svg"));
-  static QIcon iconChecked(QLatin1String(":/qt/etc/NetworkOff.svg"));
-
-  QIcon& icon = (isChecked() ? iconChecked : iconUnchecked);
-  if (icon.isNull())
-    return;
+  const QIcon& icon = GetIcon(isChecked());
 
   QPixmap& pixmap = (isChecked() ? m_Checked : m_Unchecked);
 
@@ -1075,9 +1099,9 @@ RoutingWidget::RoutingWidget(QWidget* parent /*= nullptr*/)
   fnt.setPointSize(12);
   label->setFont(fnt);
   headerLayout->addWidget(label);
-  m_Incoming.mute = new MuteCheckBox(0, m_Incoming.base);
+  m_Incoming.mute = new RoutingCheckBox(RoutingCheckBox::Style::Mute, 0, m_Incoming.base);
   m_Incoming.mute->setToolTip(tr("Mute all running input"));
-  connect(m_Incoming.mute, &MuteCheckBox::toggledWithId, this, &RoutingWidget::onMuteToggled);
+  connect(m_Incoming.mute, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onMuteToggled);
   headerLayout->addWidget(m_Incoming.mute, 0, Qt::AlignCenter);
   headerLayout->addStretch(std::numeric_limits<int>::max());
 
@@ -1089,9 +1113,9 @@ RoutingWidget::RoutingWidget(QWidget* parent /*= nullptr*/)
   label = new QLabel(tr("Outgoing"), m_Outgoing.base);
   label->setFont(fnt);
   headerLayout->addWidget(label);
-  m_Outgoing.mute = new MuteCheckBox(1, m_Outgoing.base);
+  m_Outgoing.mute = new RoutingCheckBox(RoutingCheckBox::Style::Mute, 1, m_Outgoing.base);
   m_Outgoing.mute->setToolTip(tr("Mute all running output"));
-  connect(m_Outgoing.mute, &MuteCheckBox::toggledWithId, this, &RoutingWidget::onMuteToggled);
+  connect(m_Outgoing.mute, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onMuteToggled);
   headerLayout->addWidget(m_Outgoing.mute, 0, Qt::AlignCenter);
   headerLayout->addStretch(std::numeric_limits<int>::max());
 
@@ -1148,14 +1172,7 @@ RoutingWidget::RoutingWidget(QWidget* parent /*= nullptr*/)
     {
       case Col::kLabel:
       case Col::kInIP:
-      case Col::kOutIP:
-        m_Cols->setStretchFactor(i, 3);
-        break;
-
-        // case Col::kDivider:
-        //   col->setMinimumWidth(48);
-        //   col->setMaximumWidth(48);
-        //   break;
+      case Col::kOutIP: m_Cols->setStretchFactor(i, 3); break;
 
       case Col::kInPath:
       case Col::kOutPath: m_Cols->setStretchFactor(i, 8); break;
@@ -1253,10 +1270,10 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   connect(row.enable, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onEnableToggled);
   AddCol(col++, row.enable, /*fixed*/ true);
 
-  row.mute = new MuteCheckBox(id, m_Cols->widget(col));
+  row.mute = new RoutingCheckBox(RoutingCheckBox::Style::Mute, id, m_Cols->widget(col));
   row.mute->setToolTip(tr("Temporarily mute running route"));
   row.mute->setChecked(route.mute);
-  connect(row.mute, &MuteCheckBox::toggledWithId, this, &RoutingWidget::onMuteRouteToggled);
+  connect(row.mute, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onMuteRouteToggled);
   AddCol(col++, row.mute, /*fixed*/ true);
 
   row.label = new LineEdit(label, m_Cols->widget(col));
@@ -1870,8 +1887,9 @@ void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
     return;
 
   const Row& r = m_Rows[row];
-  r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, /*script*/ false));
-  r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, /*script*/ false));
+  Protocol outProtocol = r.outProtocol->GetProtocol();
+  r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, outProtocol, /*script*/ false));
+  r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, outProtocol, /*script*/ false));
   r.inPath->setEnabled(r.enable->isChecked() && protocol != Protocol::ksACN);
 
   if (protocol != Protocol::kPSN)
@@ -1889,9 +1907,10 @@ void RoutingWidget::onOutProtocolChanged(size_t row, Protocol protocol)
     return;
 
   const Row& r = m_Rows[row];
-  r.outPort->setToolTip(GetHelpText(Col::kOutPort, protocol, /*script*/ false));
-  r.outPath->setToolTip(GetHelpText(Col::kOutPath, protocol, /*script*/ false));
-  r.outScriptText->setToolTip(GetHelpText(Col::kOutPath, protocol, /*script*/ true));
+  Protocol inProtocol = r.inProtocol->GetProtocol();
+  r.outPort->setToolTip(GetHelpText(Col::kOutPort, inProtocol, protocol, /*script*/ false));
+  r.outPath->setToolTip(GetHelpText(Col::kOutPath, inProtocol, protocol, /*script*/ false));
+  r.outScriptText->setToolTip(GetHelpText(Col::kOutPath, inProtocol, protocol, /*script*/ true));
 
   if (protocol != Protocol::kPSN)
     return;
@@ -1919,7 +1938,7 @@ void RoutingWidget::onHeaderHelpClicked(size_t id)
     m_Help.edit->setReadOnly(true);
   }
 
-  m_Help.edit->setText(GetHelpText(static_cast<Col>(id), /*protocol*/ std::nullopt, /*script*/ true));
+  m_Help.edit->setText(GetHelpText(static_cast<Col>(id), Protocol::kInvalid, Protocol::kInvalid, /*script*/ true));
   m_Help.edit->document()->adjustSize();
 
   // adjust to document size
@@ -1982,15 +2001,16 @@ bool RoutingWidget::HasRoute(const Router::ROUTES& routes, const EosRouteSrc& sr
   return false;
 }
 
-QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bool script)
+QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outProtocol, bool script)
 {
   QString text;
+  bool all = (inProtocol == Protocol::kInvalid && outProtocol == Protocol::kInvalid);
 
   switch (col)
   {
     case Col::kInPort:
     {
-      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+      if (inProtocol == Protocol::ksACN)
         text = tr("Route sACN levels received on this sACN universe (REQUIRED)");
       else
         text = tr("Route packets received on this port (REQUIRED)");
@@ -1999,11 +2019,7 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
 
     case Col::kInPath:
     {
-      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
-      {
-        text = tr("Not used for incoming sACN");
-      }
-      else
+      if (inProtocol != Protocol::ksACN)
       {
         text =
             tr("Only route received OSC commands with this specific OSC command path\n"
@@ -2012,16 +2028,19 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
                "Leave blank to route received packets with any OSC command path (or non-OSC packets)");
       }
 
-      if (!protocol.has_value())
+      if (all || inProtocol == Protocol::ksACN)
       {
+        if (!text.isEmpty())
+          text += "\n\n";
+
         text +=
-            tr("\n\n"
-               "Incoming sACN:\n"
+            tr("Incoming sACN:\n"
                "  Port is the sACN universe\n"
-               "  Path is not used");
+               "  Path is not used"
+               "  Use %1 - %512 to reference the universe levels in Outgoing path");
       }
 
-      if (protocol.value_or(Protocol::kPSN) == Protocol::kPSN)
+      if (all || inProtocol == Protocol::kPSN)
       {
         text +=
             tr("\n\n"
@@ -2038,7 +2057,7 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
                "    /psn/<id>/pos/speed/orientation/acceleration/...");
       }
 
-      if (protocol.has_value())
+      if (!all)
       {
         text +=
             tr("\n\n"
@@ -2049,7 +2068,7 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
 
     case Col::kOutPort:
     {
-      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+      if (outProtocol == Protocol::ksACN)
       {
         text =
             tr("Route recevied packets to this outgoing sACN universe\n"
@@ -2068,36 +2087,39 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
 
     case Col::kOutPath:
     {
-      if (protocol.has_value() && protocol.value() == Protocol::ksACN)
+      if (outProtocol == Protocol::ksACN)
         text = tr("Route received packets to this outgoing sACN universe");
       else
         text = tr("Route received packets to this OSC command");
 
       text +=
           tr("\n\n"
-             "Use %1, %2, %3, etc... to insert specific sections from the received OSC command");
+             "Use %1, %2, %3, etc... to insert specific sections from the received OSC command"
+             "\n\n"
+             "Ex: Remap path\n"
+             "Input:  /eos/out/event/cue/1/25/fire\n"
+             "Path:   /cue/%6/start\n"
+             "Output: /cue/25/start\n"
+             "\n"
+             "Ex: Remap path to argument\n"
+             "Input:  /cue/25/start\n"
+             "Path:   /eos/cue/fire=%2\n"
+             "Output: /eos/cue/fire, 25(i)\n"
+             "\n"
+             "Ex: Remap argument to path\n"
+             "Input:  /eos/cue/fire, 25(i)\n"
+             "Path:   /eos/%4/start\n"
+             "Output: /cue/25/start");
 
-      if (protocol.value_or(Protocol::kOSC) == Protocol::kOSC)
+      if (all || inProtocol == Protocol::ksACN)
       {
         text +=
             tr("\n\n"
-               "Ex: Remap path\n"
-               "Input:  /eos/out/event/cue/1/25/fire\n"
-               "Path:   /cue/%6/start\n"
-               "Output: /cue/25/start\n"
-               "\n"
-               "Ex: Remap path to argument\n"
-               "Input:  /cue/25/start\n"
-               "Path:   /eos/cue/fire=%2\n"
-               "Output: /eos/cue/fire, 25(i)\n"
-               "\n"
-               "Ex: Remap argument to path\n"
-               "Input:  /eos/cue/fire, 25(i)\n"
-               "Path:   /eos/%4/start\n"
-               "Output: /cue/25/start");
+               "Incoming sACN:\n"
+               "  Use %1 - %512 to reference the universe levels");
       }
 
-      if (protocol.value_or(Protocol::ksACN) == Protocol::ksACN)
+      if (all || outProtocol == Protocol::ksACN)
       {
         text +=
             tr("\n\n"
@@ -2118,11 +2140,11 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
                "Output: sACN output universe: 10=255, 11=0, 12=127");
       }
 
-      if (protocol.value_or(Protocol::kPSN) == Protocol::kPSN)
+      if (all || inProtocol == Protocol::kPSN || outProtocol == Protocol::kPSN)
       {
         text +=
             tr("\n\n"
-               "Outgoing PSN:\n"
+               "Incoming/Outgoing PSN:\n"
                "  Individual:\n"
                "    /psn/<id>/pos=x,y,z\n"
                "    /psn/<id>/speed=x,y,z\n"
@@ -2162,7 +2184,7 @@ QString RoutingWidget::GetHelpText(Col col, std::optional<Protocol> protocol, bo
                "ARGS[0] = Math.round(ARGS[0] * 255);");
       }
 
-      if (protocol.has_value())
+      if (!all)
       {
         text +=
             tr("\n\n"

@@ -150,31 +150,25 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class RoutingCheckBox : public QCheckBox
+class RoutingCheckBox : public QAbstractButton
 {
   Q_OBJECT
 
 public:
-  RoutingCheckBox(size_t id, QWidget* parent = nullptr);
+  enum class Style
+  {
+    Normal,
+    Mute
+  };
 
-signals:
-  void toggledWithId(size_t id, bool checked);
+  explicit RoutingCheckBox(size_t id, QWidget* parent = nullptr);
+  explicit RoutingCheckBox(Style checkBoxStyle, size_t id, QWidget* parent = nullptr);
 
-private slots:
-  void onToggled(bool checked);
+  QSize sizeHint() const override { return QSize(24, 24); }
+  QSize minimumSizeHint() const override { return sizeHint(); }
 
-private:
-  size_t m_Id = 0;
-};
-
-////////////////////////////////////////////////////////////////////////////////
-
-class MuteCheckBox : public QAbstractButton
-{
-  Q_OBJECT
-
-public:
-  MuteCheckBox(size_t id, QWidget* parent = nullptr);
+  const QIcon& GetIcon(bool checked) const { return GetIcon(m_Style, checked); }
+  static const QIcon& GetIcon(Style checkBoxStyle, bool checked);
 
 signals:
   void toggledWithId(size_t id, bool checked);
@@ -186,9 +180,12 @@ protected:
   void paintEvent(QPaintEvent* event) override;
 
 private:
+  Style m_Style = Style::Normal;
   size_t m_Id = 0;
   QPixmap m_Unchecked;
   QPixmap m_Checked;
+
+  void Construct();
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -435,7 +432,7 @@ private:
   struct Header
   {
     QWidget* base = nullptr;
-    MuteCheckBox* mute = nullptr;
+    RoutingCheckBox* mute = nullptr;
   };
 
   struct Row
@@ -443,7 +440,7 @@ private:
     size_t id = 0;
     ItemStateTable::ID inItemStateTableId = ItemStateTable::sm_Invalid_Id;
     RoutingCheckBox* enable = nullptr;
-    MuteCheckBox* mute = nullptr;
+    RoutingCheckBox* mute = nullptr;
     LineEdit* label = nullptr;
     Indicator* inState = nullptr;
     Indicator* inActivity = nullptr;
@@ -497,7 +494,7 @@ private:
 
   static QString HeaderForCol(Col col);
   static bool HasRoute(const Router::ROUTES& routes, const EosRouteSrc& src, const EosRouteDst& dst);
-  static QString GetHelpText(Col col, std::optional<Protocol> protocol, bool script);
+  static QString GetHelpText(Col col, Protocol inProtocol, Protocol outProtocol, bool script);
 };
 
 ////////////////////////////////////////////////////////////////////////////////

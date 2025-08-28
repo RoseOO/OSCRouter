@@ -1265,13 +1265,13 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   row.id = id;
 
   row.enable = new RoutingCheckBox(id, m_Cols->widget(col));
-  row.enable->setToolTip(tr("Enable this route"));
+  row.enable->setToolTip(tr("Enable this route - enforced when you click [Apply]"));
   row.enable->setChecked(route.enable);
   connect(row.enable, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onEnableToggled);
   AddCol(col++, row.enable, /*fixed*/ true);
 
   row.mute = new RoutingCheckBox(RoutingCheckBox::Style::Mute, id, m_Cols->widget(col));
-  row.mute->setToolTip(tr("Temporarily mute running route"));
+  row.mute->setToolTip(tr("Mute running route"));
   row.mute->setChecked(route.mute);
   connect(row.mute, &RoutingCheckBox::toggledWithId, this, &RoutingWidget::onMuteRouteToggled);
   AddCol(col++, row.mute, /*fixed*/ true);

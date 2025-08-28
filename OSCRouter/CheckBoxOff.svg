@@ -7,17 +7,56 @@
    viewBox="0 0 0.32 0.32"
    version="1.1"
    id="svg1"
+   sodipodi:docname="CheckBoxOff.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:cc="http://creativecommons.org/ns#">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="true"
+     inkscape:zoom="78.418482"
+     inkscape:cx="10.654376"
+     inkscape:cy="7.7596503"
+     inkscape:window-width="3840"
+     inkscape:window-height="2054"
+     inkscape:window-x="2869"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1">
+    <inkscape:grid
+       id="grid1"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="0.02"
+       spacingy="0.02"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       enabled="true"
+       visible="true" />
+  </sodipodi:namedview>
   <defs
      id="defs1" />
   <path
-     d="M 0.06,0 C 0.02710938,0 0,0.02710938 0,0.06 v 0.2 c 0,0.0328906 0.02710938,0.06 0.06,0.06 h 0.2 c 0.0328906,0 0.06,-0.0271094 0.06,-0.06 V 0.06 C 0.32,0.02710938 0.29289062,0 0.26,0 Z m 0,0.04 h 0.2 c 0.009628,0 0.02,0.01141431 0.02,0.02 v 0.2 c 0,0.0114062 -0.008594,0.02 -0.02,0.02 H 0.06 C 0.04859376,0.28 0.04,0.271406 0.04,0.26 v -0.2 c 0,-0.01140624 0.0085938,-0.02 0.02,-0.02 z"
+     d="M 0.06625,0.01 C 0.03541505,0.01 0.01,0.03541505 0.01,0.06625 v 0.1875 C 0.01,0.28458496 0.03541505,0.31 0.06625,0.31 h 0.1875 C 0.28458494,0.31 0.31,0.28458494 0.31,0.25375 V 0.06625 C 0.31,0.03541505 0.28458495,0.01 0.25375,0.01 Z m 0,0.01875 h 0.18749999 c 0.01875,0 0.0375,0.01875 0.0375,0.0375 v 0.18749999 c 0,0.01875 -0.01875,0.0375 -0.0375,0.0375 H 0.06625 c -0.01875,0 -0.0375,-0.01875 -0.0375,-0.0375 V 0.06625 c 0,-0.01875 0.01875,-0.0375 0.0375,-0.0375 z"
      fill="#2e3436"
      id="path1"
-     style="fill:#c8c8c8;fill-opacity:1;stroke-width:0.02" />
+     style="fill:#c8c8c8;fill-opacity:1;stroke-width:0.01875"
+     sodipodi:nodetypes="ssssssssssssssssss" />
   <metadata
      id="metadata1">
     <rdf:RDF>

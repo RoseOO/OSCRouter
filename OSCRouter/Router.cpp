@@ -1169,14 +1169,14 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
         routes = &routesBysACNUniverse;
 
         if (route.dst.addr.port == 0)
-          route.dst.addr.port = STREAM_IP_PORT;  // no destination port specified, so assume same port as source
+          route.dst.addr.port = route.src.addr.port;  // no destination port specified, so assume same port as source
       }
       else if (route.src.protocol == Protocol::kArtNet)
       {
         routes = &routesByArtNetUniverse;
 
         if (route.dst.addr.port == 0)
-          route.dst.addr.port = 6454;  // no destination port specified, so assume same port as source
+          route.dst.addr.port = route.src.addr.port;  // no destination port specified, so assume same port as source
       }
       else
       {
@@ -1325,10 +1325,10 @@ void RouterThread::DestroyArtNet(ArtNet &artnet)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, sACN &sacn)
+void RouterThread::BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, ROUTES_BY_PORT &routesByArtNetUniverse, sACN &sacn)
 {
   bool hasInput = !routesBysACNUniverse.empty();
-  bool hasOutput = HasProtocolOutput(routesByPort, Protocol::ksACN);
+  bool hasOutput = HasProtocolOutput(routesByPort, Protocol::ksACN) || HasProtocolOutput(routesBysACNUniverse, Protocol::ksACN) || HasProtocolOutput(routesByArtNetUniverse, Protocol::ksACN);
   if (!hasInput && !hasOutput)
     return;
 
@@ -1460,10 +1460,10 @@ int ArtNetUniverseData(artnet_node n, int port, void *d)
   return 0;
 }
 
-void RouterThread::BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesByArtNetUniverse, ArtNet &artnet)
+void RouterThread::BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, ROUTES_BY_PORT &routesByArtNetUniverse, ArtNet &artnet)
 {
   bool hasInput = !routesByArtNetUniverse.empty();
-  bool hasOutput = HasProtocolOutput(routesByPort, Protocol::kArtNet);
+  bool hasOutput = HasProtocolOutput(routesByPort, Protocol::kArtNet) || HasProtocolOutput(routesBysACNUniverse, Protocol::kArtNet) || HasProtocolOutput(routesByArtNetUniverse, Protocol::kArtNet);
   if (!hasInput && !hasOutput)
     return;
 
@@ -1719,33 +1719,32 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT 
             if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet)
             {
               EosPacket oscPacket;
-              if (MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, oscPacket))
-              {
-                bool sent = false;
-                if (routeDst.dst.protocol == Protocol::kPSN)
-                {
-                  EosPacket psnPacket;
-                  if (MakePSNPacket(oscPacket, psnPacket) && thread->Send(psnPacket))
-                    sent = true;
-                }
-                else if (routeDst.dst.protocol == Protocol::ksACN)
-                {
-                  if (SendsACN(sacn, routeDst.dst, oscPacket))
-                    sent = true;
-                }
-                else if (routeDst.dst.protocol == Protocol::kArtNet)
-                {
-                  if (SendArtNet(artnet, routeDst.dst, oscPacket))
-                    sent = true;
-                }
-                else if (thread->Send(oscPacket))
-                  sent = true;
+              MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, oscPacket);
 
-                if (sent)
-                {
-                  SetItemActivity(routeDst.srcItemStateTableId);
-                  SetItemActivity(thread->GetItemStateTableId());
-                }
+              bool sent = false;
+              if (routeDst.dst.protocol == Protocol::kPSN)
+              {
+                EosPacket psnPacket;
+                if (MakePSNPacket(oscPacket, psnPacket) && thread->Send(psnPacket))
+                  sent = true;
+              }
+              else if (routeDst.dst.protocol == Protocol::ksACN)
+              {
+                if (SendsACN(sacn, artnet, addr, protocol, routeDst.dst, oscPacket))
+                  sent = true;
+              }
+              else if (routeDst.dst.protocol == Protocol::kArtNet)
+              {
+                if (SendArtNet(artnet, addr, protocol, routeDst.dst, oscPacket))
+                  sent = true;
+              }
+              else if (oscPacket.GetDataConst() && oscPacket.GetSize() > 0 && thread->Send(oscPacket))
+                sent = true;
+
+              if (sent)
+              {
+                SetItemActivity(routeDst.srcItemStateTableId);
+                SetItemActivity(thread->GetItemStateTableId());
               }
             }
             else if (thread->Send(recvPacket.packet))
@@ -2005,7 +2004,7 @@ bool RouterThread::MakePSNPacket(EosPacket &osc, EosPacket &psn)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RouterThread::SendsACN(sACN &sacn, const EosRouteDst &dst, EosPacket &osc)
+bool RouterThread::SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Protocol protocol, const EosRouteDst &dst, EosPacket &osc)
 {
   if (!sacn.server)
     return false;
@@ -2014,288 +2013,396 @@ bool RouterThread::SendsACN(sACN &sacn, const EosRouteDst &dst, EosPacket &osc)
   if (universeNumber == 0)
     return false;
 
-  char *data = osc.GetData();
-  if (!data || osc.GetSize() < 1)
-    return false;
+  int offset = 0;
+  uint1 priority = static_cast<uint1>(DEFAULT_PRIORITY);
+  bool hasPriority = false;
+  bool perChannelPriority = false;
+  size_t argCount = 0xffffffff;
+  OSCArgument *args = nullptr;
 
   // find osc path null terminator
   bool sent = false;
-  for (int i = 0; i < osc.GetSize(); i++)
+  char *data = osc.GetData();
+  if (data)
   {
-    if (data[i] == 0)
+    for (int i = 0; i < osc.GetSize(); i++)
     {
-      size_t argCount = 0xffffffff;
-      OSCArgument *args = OSCArgument::GetArgs(&data[i], static_cast<size_t>(osc.GetSize()), argCount);
-      if (args)
+      if (data[i] == 0)
       {
-        if (argCount != 0)
+        args = OSCArgument::GetArgs(&data[i], static_cast<size_t>(osc.GetSize()), argCount);
+        QString path = QString::fromUtf8(data[0] == '/' ? &data[1] : &data[0]);
+        QStringList parts = path.split(QLatin1Char('/'));
+        for (int part = 0; part < parts.size(); ++part)
         {
-          int offset = 0;
-          uint1 priority = static_cast<uint1>(DEFAULT_PRIORITY);
-          bool hasPriority = false;
-          bool perChannelPriority = false;
-
-          QString path = QString::fromUtf8(data[0] == '/' ? &data[1] : &data[0]);
-          QStringList parts = path.split(QLatin1Char('/'));
-          for (int part = 0; part < parts.size(); ++part)
+          if (parts[part] == QLatin1String("offset"))
           {
-            if (parts[part] == QLatin1String("offset"))
+            int numberPart = part + 1;
+            if (numberPart < parts.size())
             {
-              int numberPart = part + 1;
-              if (numberPart < parts.size())
+              bool ok = false;
+              int n = parts[numberPart].toInt(&ok);
+              if (ok)
               {
-                bool ok = false;
-                int n = parts[numberPart].toInt(&ok);
-                if (ok)
-                {
-                  offset = std::max(0, n - 1);
-                  ++part;
-                }
-              }
-            }
-            else if (parts[part] == QLatin1String("priority"))
-            {
-              int numberPart = part + 1;
-              if (numberPart < parts.size())
-              {
-                bool ok = false;
-                int n = parts[numberPart].toInt(&ok);
-                if (ok && n >= 0)
-                {
-                  priority = static_cast<uint1>(std::min(n, 255));
-                  hasPriority = true;
-                  ++part;
-                }
-              }
-            }
-            else if (parts[part] == QLatin1String("perChannelPriority"))
-            {
-              int numberPart = part + 1;
-              if (numberPart < parts.size())
-              {
-                bool ok = false;
-                int n = parts[numberPart].toInt(&ok);
-                if (ok && n >= 0)
-                {
-                  priority = static_cast<uint1>(std::min(n, 255));
-                  hasPriority = true;
-                  perChannelPriority = true;
-                  ++part;
-                }
+                offset = std::max(0, n - 1);
+                ++part;
               }
             }
           }
-
-          if (offset < UNIVERSE_SIZE)
+          else if (parts[part] == QLatin1String("priority"))
           {
-            SendUniverse &universe = sacn.output[universeNumber];
-
-            static const uint1 kCIDBytes[] = {0x37, 0x6b, 0xa8, 0x33, 0x93, 0xf1, 0x4c, 0xcf, 0x91, 0xc0, 0xe1, 0x4c, 0xaf, 0x76, 0xe2, 0xd4};
-            static const CID kCID(kCIDBytes);
-            static const char *kName = "OSCRouter";
-
-            bool dirty = false;
-
-            // if priority changed, must re-create universe
-            if (universe.dmx.channels && !perChannelPriority && hasPriority && universe.priority != priority)
-              universe.dmx = SendUniverseData();
-
-            if (!universe.dmx.channels)
+            int numberPart = part + 1;
+            if (numberPart < parts.size())
             {
-              // create dmx
-              uint1 *pslots = nullptr;
-              uint handle = 0;
-              if (sacn.server->CreateUniverse(kCID, nullptr, 0, kName, static_cast<uint1>(priority), 0, 0, STARTCODE_DMX, universeNumber, static_cast<uint2>(UNIVERSE_SIZE), pslots, handle))
+              bool ok = false;
+              int n = parts[numberPart].toInt(&ok);
+              if (ok && n >= 0)
               {
-                universe.priority = priority;
-                universe.dmx.handle = handle;
-                universe.dmx.channels = pslots;
-                dirty = true;
-
-                m_PrivateLog.AddInfo(QStringLiteral("created sACN dmx output universe %1").arg(universeNumber).toUtf8().constData());
+                priority = static_cast<uint1>(std::min(n, 255));
+                hasPriority = true;
+                ++part;
               }
             }
-
-            if (universe.dmx.channels)
+          }
+          else if (parts[part] == QLatin1String("perChannelPriority"))
+          {
+            int numberPart = part + 1;
+            if (numberPart < parts.size())
             {
-              if (perChannelPriority)
+              bool ok = false;
+              int n = parts[numberPart].toInt(&ok);
+              if (ok && n >= 0)
               {
-                bool initialize = false;
-                if (!universe.channelPriority.channels)
-                {
-                  // create perChannelPriority
-                  uint1 *pslots = nullptr;
-                  uint handle = 0;
-                  if (sacn.server->CreateUniverse(kCID, nullptr, 0, kName, static_cast<uint1>(priority), 0, 0, STARTCODE_PRIORITY, universeNumber, static_cast<uint2>(UNIVERSE_SIZE), pslots, handle))
-                  {
-                    universe.channelPriority.handle = handle;
-                    universe.channelPriority.channels = pslots;
-                    initialize = true;
-
-                    m_PrivateLog.AddInfo(QStringLiteral("created sACN per channel priority output universe %1").arg(universeNumber).toUtf8().constData());
-                  }
-                }
-
-                if (universe.channelPriority.channels && (initialize || (hasPriority && universe.perChannelPriority != priority)))
-                {
-                  // update perChannelPriority
-                  universe.perChannelPriority = priority;
-
-                  for (size_t arg = 0; arg < argCount; ++arg)
-                  {
-                    int channel = offset + static_cast<int>(arg);
-                    if (channel >= UNIVERSE_SIZE)
-                      break;
-
-                    universe.channelPriority.channels[channel] = universe.perChannelPriority;
-                  }
-
-                  sacn.server->SetUniversesDirty(&universe.channelPriority.handle, 1);
-                }
-              }
-              else if (universe.channelPriority.channels)
-              {
-                sacn.server->DestroyUniverse(universe.channelPriority.handle);
-                universe.channelPriority = SendUniverseData();
-
-                m_PrivateLog.AddInfo(QStringLiteral("destroyed sACN per channel priority output universe %1").arg(universeNumber).toUtf8().constData());
-              }
-
-              // update dmx
-              for (size_t arg = 0; arg < argCount; ++arg)
-              {
-                int channel = offset + static_cast<int>(arg);
-                if (channel >= UNIVERSE_SIZE)
-                  break;
-
-                int n = 0;
-                if (!args[arg].GetInt(n))
-                  n = 0;
-
-                uint1 value = static_cast<uint1>(std::clamp(n, 0, 255));
-                if (universe.dmx.channels[channel] != value)
-                {
-                  universe.dmx.channels[channel] = value;
-                  dirty = true;
-                }
-              }
-
-              if (dirty)
-              {
-                sacn.server->SetUniversesDirty(&universe.dmx.handle, 1);
-                sent = true;
+                priority = static_cast<uint1>(std::min(n, 255));
+                hasPriority = true;
+                perChannelPriority = true;
+                ++part;
               }
             }
           }
         }
 
-        delete[] args;
+        break;
       }
-
-      break;
     }
   }
+
+  if (offset < UNIVERSE_SIZE)
+  {
+    SendUniverse &universe = sacn.output[universeNumber];
+
+    static const uint1 kCIDBytes[] = {0x37, 0x6b, 0xa8, 0x33, 0x93, 0xf1, 0x4c, 0xcf, 0x91, 0xc0, 0xe1, 0x4c, 0xaf, 0x76, 0xe2, 0xd4};
+    static const CID kCID(kCIDBytes);
+    static const char *kName = "OSCRouter";
+
+    bool dirty = false;
+
+    // if priority changed, must re-create universe
+    if (universe.dmx.channels && !perChannelPriority && hasPriority && universe.priority != priority)
+      universe.dmx = SendUniverseData();
+
+    if (!universe.dmx.channels)
+    {
+      // create dmx
+      uint1 *pslots = nullptr;
+      uint handle = 0;
+      if (sacn.server->CreateUniverse(kCID, nullptr, 0, kName, static_cast<uint1>(priority), 0, 0, STARTCODE_DMX, universeNumber, static_cast<uint2>(UNIVERSE_SIZE), pslots, handle))
+      {
+        universe.priority = priority;
+        universe.dmx.handle = handle;
+        universe.dmx.channels = pslots;
+        dirty = true;
+
+        m_PrivateLog.AddInfo(QStringLiteral("created sACN dmx output universe %1").arg(universeNumber).toUtf8().constData());
+      }
+    }
+
+    if (universe.dmx.channels)
+    {
+      if (perChannelPriority)
+      {
+        bool initialize = false;
+        if (!universe.channelPriority.channels)
+        {
+          // create perChannelPriority
+          uint1 *pslots = nullptr;
+          uint handle = 0;
+          if (sacn.server->CreateUniverse(kCID, nullptr, 0, kName, static_cast<uint1>(priority), 0, 0, STARTCODE_PRIORITY, universeNumber, static_cast<uint2>(UNIVERSE_SIZE), pslots, handle))
+          {
+            universe.channelPriority.handle = handle;
+            universe.channelPriority.channels = pslots;
+            initialize = true;
+
+            m_PrivateLog.AddInfo(QStringLiteral("created sACN per channel priority output universe %1").arg(universeNumber).toUtf8().constData());
+          }
+        }
+
+        if (universe.channelPriority.channels && (initialize || (hasPriority && universe.perChannelPriority != priority)))
+        {
+          // update perChannelPriority
+          universe.perChannelPriority = priority;
+
+          for (size_t arg = 0; arg < argCount; ++arg)
+          {
+            int channel = offset + static_cast<int>(arg);
+            if (channel >= UNIVERSE_SIZE)
+              break;
+
+            universe.channelPriority.channels[channel] = universe.perChannelPriority;
+          }
+
+          sacn.server->SetUniversesDirty(&universe.channelPriority.handle, 1);
+        }
+      }
+      else if (universe.channelPriority.channels)
+      {
+        sacn.server->DestroyUniverse(universe.channelPriority.handle);
+        universe.channelPriority = SendUniverseData();
+
+        m_PrivateLog.AddInfo(QStringLiteral("destroyed sACN per channel priority output universe %1").arg(universeNumber).toUtf8().constData());
+      }
+
+      // update dmx
+      if (args && argCount != 0)
+      {
+        for (size_t arg = 0; arg < argCount; ++arg)
+        {
+          int channel = offset + static_cast<int>(arg);
+          if (channel >= UNIVERSE_SIZE)
+            break;
+
+          int n = 0;
+          if (!args[arg].GetInt(n))
+            n = 0;
+
+          uint1 value = static_cast<uint1>(std::clamp(n, 0, 255));
+          if (universe.dmx.channels[channel] != value)
+          {
+            universe.dmx.channels[channel] = value;
+            dirty = true;
+          }
+        }
+      }
+      else if (protocol == Protocol::ksACN)
+      {
+        // special case: no args, so send sACN universe
+        bool found = false;
+        std::array<uint8_t, UNIVERSE_SIZE> srcDMX;
+        {
+          QMutexLocker locker(&m_sACNRecv.mutex);
+          UNIVERSE_LIST::const_iterator sACNIter = m_sACNRecv.merged.find(addr.port);
+          if (sACNIter != m_sACNRecv.merged.end())
+          {
+            srcDMX = sACNIter->second.dmx;
+            found = true;
+          }
+        }
+
+        if (found)
+        {
+          for (int i = 0; i < static_cast<int>(srcDMX.size()); ++i)
+          {
+            int channel = offset + i;
+            if (channel >= UNIVERSE_SIZE)
+              break;
+
+            if (universe.dmx.channels[channel] != srcDMX[channel])
+            {
+              universe.dmx.channels[channel] = srcDMX[channel];
+              dirty = true;
+            }
+          }
+        }
+      }
+      else if (protocol == Protocol::kArtNet)
+      {
+        // special case: no args, so send ArtNet universe
+        ARTNET_RECV_UNIVERSE_LIST::const_iterator artNetIter = artnet.inputs.find(static_cast<uint8_t>(addr.port));
+        if (artNetIter != artnet.inputs.end())
+        {
+          int srcDMXLength = 0;
+          uint8_t *srcDMX = artnet_read_dmx(artNetIter->second, 0, &srcDMXLength);
+          if (srcDMX)
+          {
+            for (int i = 0; i < srcDMXLength; ++i)
+            {
+              int channel = offset + i;
+              if (channel >= UNIVERSE_SIZE)
+                break;
+
+              if (universe.dmx.channels[channel] != srcDMX[channel])
+              {
+                universe.dmx.channels[channel] = srcDMX[channel];
+                dirty = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (dirty)
+      {
+        sacn.server->SetUniversesDirty(&universe.dmx.handle, 1);
+        sent = true;
+      }
+    }
+  }
+
+  if (args)
+    delete[] args;
 
   return sent;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RouterThread::SendArtNet(ArtNet &artnet, const EosRouteDst &dst, EosPacket &osc)
+bool RouterThread::SendArtNet(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const EosRouteDst &dst, EosPacket &osc)
 {
   if (!artnet.server)
     return false;
 
   uint8_t universeNumber = static_cast<uint8_t>(dst.addr.port);
-  if (universeNumber == 0)
-    return false;
 
-  char *data = osc.GetData();
-  if (!data || osc.GetSize() < 1)
-    return false;
+  int offset = 0;
+  size_t argCount = 0xffffffff;
+  OSCArgument *args = nullptr;
 
   // find osc path null terminator
   bool sent = false;
-  for (int i = 0; i < osc.GetSize(); i++)
+  char *data = osc.GetData();
+  if (data)
   {
-    if (data[i] == 0)
+    for (int i = 0; i < osc.GetSize(); i++)
     {
-      size_t argCount = 0xffffffff;
-      OSCArgument *args = OSCArgument::GetArgs(&data[i], static_cast<size_t>(osc.GetSize()), argCount);
-      if (args)
+      if (data[i] == 0)
       {
-        if (argCount != 0)
+        args = OSCArgument::GetArgs(&data[i], static_cast<size_t>(osc.GetSize()), argCount);
+        QString path = QString::fromUtf8(data[0] == '/' ? &data[1] : &data[0]);
+        QStringList parts = path.split(QLatin1Char('/'));
+        for (int part = 0; part < parts.size(); ++part)
         {
-          int offset = 0;
-
-          QString path = QString::fromUtf8(data[0] == '/' ? &data[1] : &data[0]);
-          QStringList parts = path.split(QLatin1Char('/'));
-          for (int part = 0; part < parts.size(); ++part)
+          if (parts[part] == QLatin1String("offset"))
           {
-            if (parts[part] == QLatin1String("offset"))
+            int numberPart = part + 1;
+            if (numberPart < parts.size())
             {
-              int numberPart = part + 1;
-              if (numberPart < parts.size())
+              bool ok = false;
+              int n = parts[numberPart].toInt(&ok);
+              if (ok)
               {
-                bool ok = false;
-                int n = parts[numberPart].toInt(&ok);
-                if (ok)
-                {
-                  offset = std::max(0, n - 1);
-                  ++part;
-                }
+                offset = std::max(0, n - 1);
+                ++part;
               }
-            }
-          }
-
-          if (offset < ARTNET_DMX_LENGTH)
-          {
-            bool dirty = false;
-
-            ArtNetSendUniverse *universe = nullptr;
-            ARTNET_SEND_UNIVERSE_LIST::iterator universeIter = artnet.output.find(universeNumber);
-            if (universeIter == artnet.output.end())
-            {
-              m_PrivateLog.AddInfo(QStringLiteral("created ArtNet dmx output universe %1").arg(universeNumber).toUtf8().constData());
-              universe = &artnet.output[universeNumber];
-              dirty = true;
-            }
-            else
-              universe = &universeIter->second;
-
-            // update dmx
-            for (size_t arg = 0; arg < argCount; ++arg)
-            {
-              int channel = offset + static_cast<int>(arg);
-              if (channel >= UNIVERSE_SIZE)
-                break;
-
-              int n = 0;
-              if (!args[arg].GetInt(n))
-                n = 0;
-
-              uint1 value = static_cast<uint1>(std::clamp(n, 0, 255));
-              if (universe->dmx[channel] != value)
-              {
-                universe->dmx[channel] = value;
-                dirty = true;
-              }
-            }
-
-            if (dirty)
-            {
-              if (artnet_raw_send_dmx(artnet.server, universeNumber, static_cast<int16_t>(universe->dmx.size()), universe->dmx.data()) == ARTNET_EOK)
-                sent = true;
             }
           }
         }
 
-        delete[] args;
+        break;
       }
-
-      break;
     }
   }
+
+  if (offset < ARTNET_DMX_LENGTH)
+  {
+    bool dirty = false;
+
+    ArtNetSendUniverse *universe = nullptr;
+    ARTNET_SEND_UNIVERSE_LIST::iterator universeIter = artnet.output.find(universeNumber);
+    if (universeIter == artnet.output.end())
+    {
+      m_PrivateLog.AddInfo(QStringLiteral("created ArtNet dmx output universe %1").arg(universeNumber).toUtf8().constData());
+      universe = &artnet.output[universeNumber];
+      dirty = true;
+    }
+    else
+      universe = &universeIter->second;
+
+    if (args && argCount != 0)
+    {
+      // update dmx
+      for (size_t arg = 0; arg < argCount; ++arg)
+      {
+        int channel = offset + static_cast<int>(arg);
+        if (channel >= static_cast<int>(universe->dmx.size()))
+          break;
+
+        int n = 0;
+        if (!args[arg].GetInt(n))
+          n = 0;
+
+        uint1 value = static_cast<uint1>(std::clamp(n, 0, 255));
+        if (universe->dmx[channel] != value)
+        {
+          universe->dmx[channel] = value;
+          dirty = true;
+        }
+      }
+    }
+    else if (protocol == Protocol::ksACN)
+    {
+      // special case: no args, so send sACN universe
+      bool found = false;
+      std::array<uint8_t, UNIVERSE_SIZE> srcDMX;
+      {
+        QMutexLocker locker(&m_sACNRecv.mutex);
+        UNIVERSE_LIST::const_iterator sACNIter = m_sACNRecv.merged.find(addr.port);
+        if (sACNIter != m_sACNRecv.merged.end())
+        {
+          srcDMX = sACNIter->second.dmx;
+          found = true;
+        }
+      }
+
+      if (found)
+      {
+        for (int i = 0; i < static_cast<int>(srcDMX.size()); ++i)
+        {
+          int channel = offset + i;
+          if (channel >= static_cast<int>(universe->dmx.size()))
+            break;
+
+          if (universe->dmx[channel] != srcDMX[channel])
+          {
+            universe->dmx[channel] = srcDMX[channel];
+            dirty = true;
+          }
+        }
+      }
+    }
+    else if (protocol == Protocol::kArtNet)
+    {
+      // special case: no args, so send ArtNet universe
+      ARTNET_RECV_UNIVERSE_LIST::const_iterator artNetIter = artnet.inputs.find(static_cast<uint8_t>(addr.port));
+      if (artNetIter != artnet.inputs.end())
+      {
+        int srcDMXLength = 0;
+        uint8_t *srcDMX = artnet_read_dmx(artNetIter->second, 0, &srcDMXLength);
+        if (srcDMX)
+        {
+          for (int i = 0; i < srcDMXLength; ++i)
+          {
+            int channel = offset + i;
+            if (channel >= static_cast<int>(universe->dmx.size()))
+              break;
+
+            if (universe->dmx[channel] != srcDMX[channel])
+            {
+              universe->dmx[channel] = srcDMX[channel];
+              dirty = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (dirty)
+    {
+      if (artnet_raw_send_dmx(artnet.server, universeNumber, static_cast<int16_t>(universe->dmx.size()), universe->dmx.data()) == ARTNET_EOK)
+        sent = true;
+    }
+  }
+
+  if (args)
+    delete[] args;
 
   return sent;
 }
@@ -2379,14 +2486,6 @@ void RouterThread::MakeSendPath(ArtNet &artnet, const EosAddr &addr, Protocol pr
   else
   {
     sendPath = dstPath;
-
-    if (sendPath.isEmpty())
-    {
-      if (protocol == Protocol::ksACN)
-        sendPath = QStringLiteral("/sacn=%1");
-      else if (protocol == Protocol::kArtNet)
-        sendPath = QStringLiteral("/artnet=%1");
-    }
 
     if (sendPath.contains('%'))
     {
@@ -2642,10 +2741,10 @@ void RouterThread::run()
   BuildRoutes(routesByPort, routesBysACNUniverse, routesByArtNetUniverse, udpInThreads, udpOutThreads, tcpClientThreads, tcpServerThreads);
 
   sACN sacn;
-  BuildsACN(routesByPort, routesBysACNUniverse, sacn);
+  BuildsACN(routesByPort, routesBysACNUniverse, routesByArtNetUniverse, sacn);
 
   ArtNet artnet;
-  BuildArtNet(routesByPort, routesByArtNetUniverse, artnet);
+  BuildArtNet(routesByPort, routesBysACNUniverse, routesByArtNetUniverse, artnet);
 
   while (m_Run)
   {

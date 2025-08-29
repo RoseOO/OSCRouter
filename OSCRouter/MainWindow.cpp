@@ -1071,6 +1071,7 @@ QString ProtocolComboBox::ProtocolName(Protocol protocol)
     case Protocol::kOSC: return tr("OSC");
     case Protocol::kPSN: return tr("PSN");
     case Protocol::ksACN: return tr("sACN");
+    case Protocol::kArtNet: return tr("ArtNet");
   }
 
   return tr("Unknown(%1)").arg(static_cast<int>(protocol));
@@ -1307,7 +1308,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.inIP);
 
   row.inPort = new LineEdit(m_Cols->widget(col));
-  row.inPort->setText((route.src.addr.port == 0) ? QString() : QString::number(route.src.addr.port));
+  row.inPort->setText((route.src.addr.port == 0 && route.src.protocol != Protocol::kArtNet) ? QString() : QString::number(route.src.addr.port));
   AddCol(col++, row.inPort);
 
   row.inProtocol = new ProtocolComboBox(id, route.src.protocol, m_Cols->widget(col));
@@ -1578,8 +1579,10 @@ void RoutingWidget::SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemState
     Row& row = m_Rows[i];
 
     Router::sRoute route;
+    route.src.protocol = row.inProtocol->GetProtocol();
+
     route.src.addr.port = row.inPort->text().toUShort();
-    if (route.src.addr.port == 0)
+    if (route.src.addr.port == 0 && route.src.protocol != Protocol::kArtNet)
       continue;  // port required
 
     route.enable = row.enable->isChecked();
@@ -1595,7 +1598,6 @@ void RoutingWidget::SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemState
     else
       route.src.addr.ip = row.inIP->text();
 
-    route.src.protocol = row.inProtocol->GetProtocol();
     route.src.path = row.inPath->text();
 
     route.dst.addr.ip = row.outIP->text();
@@ -1781,13 +1783,14 @@ void RoutingWidget::UpdateEnableState()
     Row& row = m_Rows[i];
 
     bool e = row.enable->isChecked();
+    Protocol protocol = row.inProtocol->GetProtocol();
 
     row.mute->setEnabled(e);
     row.label->setEnabled(e);
     row.inIP->setEnabled(e);
     row.inPort->setEnabled(e);
     row.inProtocol->setEnabled(e);
-    row.inPath->setEnabled(e && row.inProtocol->GetProtocol() != Protocol::ksACN);
+    row.inPath->setEnabled(protocol != Protocol::ksACN && protocol != Protocol::kArtNet);
     row.inMin->setEnabled(e);
     row.inMax->setEnabled(e);
 
@@ -1890,7 +1893,7 @@ void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
   Protocol outProtocol = r.outProtocol->GetProtocol();
   r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, outProtocol, /*script*/ false));
   r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, outProtocol, /*script*/ false));
-  r.inPath->setEnabled(r.enable->isChecked() && protocol != Protocol::ksACN);
+  r.inPath->setEnabled(r.enable->isChecked() && protocol != Protocol::ksACN && protocol != Protocol::kArtNet);
 
   if (protocol != Protocol::kPSN)
     return;
@@ -2010,16 +2013,18 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
   {
     case Col::kInPort:
     {
-      if (inProtocol == Protocol::ksACN)
-        text = tr("Route sACN levels received on this sACN universe (REQUIRED)");
-      else
-        text = tr("Route packets received on this port (REQUIRED)");
+      switch (inProtocol)
+      {
+        case Protocol::ksACN: text = tr("Route sACN levels received on this sACN universe (REQUIRED)"); break;
+        case Protocol::kArtNet: text = tr("Route ArtNet levels received on this ArtNet universe (REQUIRED)"); break;
+        default: text = tr("Route packets received on this port (REQUIRED)"); break;
+      }
     }
     break;
 
     case Col::kInPath:
     {
-      if (inProtocol != Protocol::ksACN)
+      if (inProtocol != Protocol::ksACN && inProtocol != Protocol::kArtNet)
       {
         text =
             tr("Only route received OSC commands with this specific OSC command path\n"
@@ -2040,11 +2045,25 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "  Use %1 - %512 to reference the universe levels in Outgoing path");
       }
 
+      if (all || inProtocol == Protocol::kArtNet)
+      {
+        if (!text.isEmpty())
+          text += "\n\n";
+
+        text +=
+            tr("Incoming ArtNet:\n"
+               "  Port is the ArtNet universe\n"
+               "  Path is not used"
+               "  Use %1 - %512 to reference the universe levels in Outgoing path");
+      }
+
       if (all || inProtocol == Protocol::kPSN)
       {
+        if (!text.isEmpty())
+          text += "\n\n";
+
         text +=
-            tr("\n\n"
-               "Incoming PSN:\n"
+            tr("Incoming PSN:\n"
                "  Individual:\n"
                "    /psn/<id>/pos=x,y,z\n"
                "    /psn/<id>/speed=x,y,z\n"
@@ -2068,29 +2087,46 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
 
     case Col::kOutPort:
     {
-      if (outProtocol == Protocol::ksACN)
+      switch (outProtocol)
       {
-        text =
-            tr("Route recevied packets to this outgoing sACN universe\n"
-               "\n"
-               "Leave blank to route packets to the same universe/port they were received on");
-      }
-      else
-      {
-        text =
-            tr("Route received packets to this port\n"
-               "\n"
-               "Leave blank to route packets to the same port they were received on");
+        case Protocol::ksACN:
+        {
+          text =
+              tr("Route recevied packets to this outgoing sACN universe\n"
+                 "\n"
+                 "Leave blank to route packets to the same universe/port they were received on");
+        }
+        break;
+
+        case Protocol::kArtNet:
+        {
+          text =
+              tr("Route recevied packets to this outgoing ArtNet universe\n"
+                 "\n"
+                 "Leave blank to route packets to the same universe/port they were received on");
+        }
+        break;
+
+        default:
+        {
+          text =
+              tr("Route received packets to this port\n"
+                 "\n"
+                 "Leave blank to route packets to the same port they were received on");
+        }
+        break;
       }
     }
     break;
 
     case Col::kOutPath:
     {
-      if (outProtocol == Protocol::ksACN)
-        text = tr("Route received packets to this outgoing sACN universe");
-      else
-        text = tr("Route received packets to this OSC command");
+      switch (outProtocol)
+      {
+        case Protocol::ksACN: text = tr("Route received packets to this outgoing sACN universe"); break;
+        case Protocol::kArtNet: text = tr("Route received packets to this outgoing ArtNet universe"); break;
+        default: text = tr("Route received packets to this OSC command"); break;
+      }
 
       text +=
           tr("\n\n"
@@ -2119,6 +2155,14 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "  Use %1 - %512 to reference the universe levels");
       }
 
+      if (all || inProtocol == Protocol::kArtNet)
+      {
+        text +=
+            tr("\n\n"
+               "Incoming ArtNet:\n"
+               "  Use %1 - %512 to reference the universe levels");
+      }
+
       if (all || outProtocol == Protocol::ksACN)
       {
         text +=
@@ -2138,6 +2182,25 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "Input:  /rgb/255/0/127\n"
                "Path:   /sacn/offset/10=%2,%3,%4\n"
                "Output: sACN output universe: 10=255, 11=0, 12=127");
+      }
+
+      if (all || outProtocol == Protocol::kArtNet)
+      {
+        text +=
+            tr("\n\n"
+               "Outgoing ArtNet:\n"
+               "  /artnet=a,b,c,...\n"
+               "  /artnet/offset/<number>=a,b,c,...\n"
+               "\n"
+               "Ex: ArtNet to OSC\n"
+               "Input:  <ArtNet universe levels: %1 - %512>\n"
+               "Path:   /eos/chan/1/param/red/green/blue=%10,%11,%12\n"
+               "Output: /eos/chan/1/param/red/green/blue, 255(f), 0(f), 127(f)\n"
+               "\n"
+               "Ex: OSC to ArtNet\n"
+               "Input:  /rgb/255/0/127\n"
+               "Path:   /sacn/offset/10=%2,%3,%4\n"
+               "Output: ArtNet output universe: 10=255, 11=0, 12=127");
       }
 
       if (all || inProtocol == Protocol::kPSN || outProtocol == Protocol::kPSN)

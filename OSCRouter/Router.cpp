@@ -22,6 +22,7 @@
 #include "EosTimer.h"
 #include "EosUdp.h"
 #include "EosTcp.h"
+#include "artnet/packets.h"
 #include "streamcommon.h"
 #include <psn_lib.hpp>
 
@@ -1081,8 +1082,8 @@ void RouterThread::Sync(EosLog::LOG_Q &logQ, ItemStateTable &itemStateTable)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, UDP_IN_THREADS &udpInThreads, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads,
-                               TCP_SERVER_THREADS &tcpServerThreads)
+void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, ROUTES_BY_PORT &routesByArtNetUniverse, UDP_IN_THREADS &udpInThreads, UDP_OUT_THREADS &udpOutThreads,
+                               TCP_CLIENT_THREADS &tcpClientThreads, TCP_SERVER_THREADS &tcpServerThreads)
 {
   m_PrivateLog.AddInfo("Building Routing Table...");
 
@@ -1170,6 +1171,13 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
         if (route.dst.addr.port == 0)
           route.dst.addr.port = STREAM_IP_PORT;  // no destination port specified, so assume same port as source
       }
+      else if (route.src.protocol == Protocol::kArtNet)
+      {
+        routes = &routesByArtNetUniverse;
+
+        if (route.dst.addr.port == 0)
+          route.dst.addr.port = 6454;  // no destination port specified, so assume same port as source
+      }
       else
       {
         for (std::vector<QNetworkAddressEntry>::const_iterator j = nics.begin(); j != nics.end(); j++)
@@ -1191,7 +1199,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
       }
 
       // create udp output thread if known dst, and not an explicit tcp client
-      if (route.dst.protocol != Protocol::ksACN && tcpClientThreads.find(route.dst.addr) == tcpClientThreads.end())
+      if (route.dst.protocol != Protocol::ksACN && route.dst.protocol != Protocol::kArtNet && tcpClientThreads.find(route.dst.addr) == tcpClientThreads.end())
         CreateUdpOutThread(route.dst.addr, route.dstItemStateTableId, udpOutThreads);
 
       // add entry to main routing table...
@@ -1298,6 +1306,25 @@ void RouterThread::DestroysACN(sACN &sacn)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void RouterThread::DestroyArtNet(ArtNet &artnet)
+{
+  for (ARTNET_RECV_UNIVERSE_LIST::iterator i = artnet.inputs.begin(); i != artnet.inputs.end(); ++i)
+  {
+    artnet_stop(i->second);
+    artnet_destroy(i->second);
+  }
+  artnet.inputs.clear();
+
+  if (artnet.server)
+  {
+    artnet_stop(artnet.server);
+    artnet_destroy(artnet.server);
+    artnet.server = nullptr;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void RouterThread::BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, sACN &sacn)
 {
   bool hasInput = !routesBysACNUniverse.empty();
@@ -1388,8 +1415,128 @@ void RouterThread::BuildsACN(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &route
       m_PrivateLog.AddError(QLatin1String("sACN server creation failed").toUtf8().constData());
   }
 
-  if (!sacn.client && !sacn.server)
-    DestroysACN(sacn);
+  if (!sacn.client)
+  {
+    for (ROUTES_BY_PORT::const_iterator universeIter = routesBysACNUniverse.begin(); universeIter != routesBysACNUniverse.end(); ++universeIter)
+    {
+      const ROUTES_BY_IP &routesByIp = universeIter->second;
+      SetItemState(routesByIp, ItemState::STATE_NOT_CONNECTED);
+    }
+
+    if (!sacn.server)
+      DestroysACN(sacn);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int ArtNetRecv(artnet_node n, void *pp, void *d)
+{
+  artnet_packet p = reinterpret_cast<artnet_packet>(pp);
+  if (!p)
+    return 0;
+
+  if (p->type != ARTNET_DMX)
+    return 0;
+
+  RouterThread::ArtNet *artnet = reinterpret_cast<RouterThread::ArtNet *>(d);
+  if (!artnet)
+    return 0;
+
+  artnet->inputIPs[n] = static_cast<unsigned int>(htonl(p->from.S_un.S_addr));
+  return 0;
+}
+
+int ArtNetUniverseData(artnet_node n, int port, void *d)
+{
+  if (!n || port != 0)
+    return 0;
+
+  RouterThread::ArtNet *artnet = reinterpret_cast<RouterThread::ArtNet *>(d);
+  if (!artnet)
+    return 0;
+
+  artnet->dirty.insert(n);
+  return 0;
+}
+
+void RouterThread::BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesByArtNetUniverse, ArtNet &artnet)
+{
+  bool hasInput = !routesByArtNetUniverse.empty();
+  bool hasOutput = HasProtocolOutput(routesByPort, Protocol::kArtNet);
+  if (!hasInput && !hasOutput)
+    return;
+
+  if (hasInput)
+  {
+    for (ROUTES_BY_PORT::const_iterator universeIter = routesByArtNetUniverse.begin(); universeIter != routesByArtNetUniverse.end(); ++universeIter)
+    {
+      uint8_t universeNumber = static_cast<uint8_t>(universeIter->first);
+      const ROUTES_BY_IP &routesByIp = universeIter->second;
+
+      ARTNET_RECV_UNIVERSE_LIST::const_iterator inputIter = artnet.inputs.find(universeNumber);
+      if (inputIter != artnet.inputs.end())
+        continue;  // already listening on this universe
+
+      artnet_node client = artnet_new(nullptr, 0);
+      if (!client)
+      {
+        SetItemState(routesByIp, ItemState::STATE_NOT_CONNECTED);
+        m_PrivateLog.AddError(QStringLiteral("ArtNet client listen on universe %1 creation failed").arg(universeNumber).toUtf8().constData());
+        continue;
+      }
+
+      artnet_set_short_name(client, "OSCRouter");
+      artnet_set_long_name(client, "OSCRouter");
+      artnet_set_port_type(client, 0, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX);
+      artnet_set_port_addr(client, 0, ARTNET_OUTPUT_PORT, universeNumber);
+      artnet_set_handler(client, ARTNET_RECV_HANDLER, ArtNetRecv, &artnet);
+
+      if (artnet_set_dmx_handler(client, ArtNetUniverseData, &artnet) != ARTNET_EOK)
+      {
+        SetItemState(routesByIp, ItemState::STATE_NOT_CONNECTED);
+        m_PrivateLog.AddError(QStringLiteral("ArtNet register listen on universe %1 failed").arg(universeNumber).toUtf8().constData());
+        artnet_destroy(client);
+        continue;
+      }
+
+      if (artnet_start(client) != ARTNET_EOK)
+      {
+        SetItemState(routesByIp, ItemState::STATE_NOT_CONNECTED);
+        m_PrivateLog.AddError(QStringLiteral("ArtNet start listen on universe %1 failed").arg(universeNumber).toUtf8().constData());
+        artnet_destroy(client);
+        continue;
+      }
+
+      SetItemState(routesByIp, ItemState::STATE_CONNECTED);
+      m_PrivateLog.AddInfo(QStringLiteral("ArtNet started listening on universe %1").arg(universeNumber).toUtf8().constData());
+      artnet.inputs[universeNumber] = client;
+    }
+  }
+
+  if (hasOutput)
+  {
+    artnet.server = artnet_new(nullptr, 0);
+    if (artnet.server)
+    {
+      m_PrivateLog.AddInfo(QLatin1String("ArtNet server created").toUtf8().constData());
+
+      artnet_set_node_type(artnet.server, ARTNET_RAW);
+      artnet_set_short_name(artnet.server, "OSCRouter");
+      artnet_set_long_name(artnet.server, "OSCRouter");
+
+      if (artnet_start(artnet.server) != ARTNET_EOK)
+      {
+        m_PrivateLog.AddInfo(QLatin1String("ArtNet server startup failed").toUtf8().constData());
+        artnet_destroy(artnet.server);
+        artnet.server = nullptr;
+      }
+      else
+        m_PrivateLog.AddInfo(QLatin1String("ArtNet server started").toUtf8().constData());
+    }
+    else
+      m_PrivateLog.AddError(QLatin1String("ArtNet server creation failed").toUtf8().constData());
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1445,7 +1592,7 @@ void RouterThread::AddRoutingDestinations(bool isOSC, const QString &path, const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::ProcessRecvQ(sACN &sacn, OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
+void RouterThread::ProcessRecvQ(sACN &sacn, ArtNet &artnet, OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
                                 TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, EosUdpInThread::RECV_Q &recvQ)
 {
   for (EosUdpInThread::RECV_Q::iterator i = recvQ.begin(); i != recvQ.end(); i++)
@@ -1464,21 +1611,21 @@ void RouterThread::ProcessRecvQ(sACN &sacn, OSCParser &oscBundleParser, ROUTES_B
       if (!bundleQ.empty())
       {
         for (EosUdpInThread::RECV_Q::iterator j = bundleQ.begin(); j != bundleQ.end(); j++)
-          ProcessRecvPacket(sacn, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, addr, Protocol::kOSC, *j);
+          ProcessRecvPacket(sacn, artnet, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, addr, Protocol::kOSC, *j);
 
         continue;
       }
     }
 
-    ProcessRecvPacket(sacn, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, addr, Protocol::kInvalid, recvPacket);
+    ProcessRecvPacket(sacn, artnet, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, addr, Protocol::kInvalid, recvPacket);
   }
   recvQ.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads, TCP_CLIENT_THREADS &tcpClientThreads,
-                                     const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket)
+void RouterThread::ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
+                                     TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket)
 {
   routingDestinationList.clear();
 
@@ -1549,10 +1696,10 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
         if (k != tcpClientThreads.end())
         {
           EosTcpClientThread *thread = k->second;
-          if (protocol == Protocol::kOSC || protocol == Protocol::ksACN)
+          if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet)
           {
             EosPacket packet;
-            if (MakeOSCPacket(addr, protocol, path, routeDst.dst, args, argsCount, packet) && thread->SendFramed(packet))
+            if (MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, packet) && thread->SendFramed(packet))
             {
               SetItemActivity(routeDst.srcItemStateTableId);
               SetItemActivity(thread->GetItemStateTableId());
@@ -1569,10 +1716,10 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
           EosUdpOutThread *thread = CreateUdpOutThread(dstAddr, routeDst.dstItemStateTableId, udpOutThreads);
           if (thread)
           {
-            if (protocol == Protocol::kOSC || protocol == Protocol::ksACN)
+            if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet)
             {
               EosPacket oscPacket;
-              if (MakeOSCPacket(addr, protocol, path, routeDst.dst, args, argsCount, oscPacket))
+              if (MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, oscPacket))
               {
                 bool sent = false;
                 if (routeDst.dst.protocol == Protocol::kPSN)
@@ -1584,6 +1731,11 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
                 else if (routeDst.dst.protocol == Protocol::ksACN)
                 {
                   if (SendsACN(sacn, routeDst.dst, oscPacket))
+                    sent = true;
+                }
+                else if (routeDst.dst.protocol == Protocol::kArtNet)
+                {
+                  if (SendArtNet(artnet, routeDst.dst, oscPacket))
                     sent = true;
                 }
                 else if (thread->Send(oscPacket))
@@ -1615,7 +1767,7 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ROUTES_BY_PORT &routesByPort, D
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RouterThread::MakeOSCPacket(const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet)
+bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet)
 {
   QString sendPath;
   if (dst.script)
@@ -1637,8 +1789,28 @@ bool RouterThread::MakeOSCPacket(const EosAddr &addr, Protocol protocol, const Q
 
       error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, /*args*/ nullptr, /*argsCount*/ 0, dmx.data(), dmx.size(), &packet);
     }
+    else if (protocol == Protocol::kArtNet)
+    {
+      const uint8_t *universe = nullptr;
+      size_t universeCount = 0;
+
+      uint8_t universeNumber = static_cast<uint8_t>(addr.port);
+      ARTNET_RECV_UNIVERSE_LIST::const_iterator i = artnet.inputs.find(universeNumber);
+      if (i != artnet.inputs.end())
+      {
+        int length = 0;
+        uint8_t *data = artnet_read_dmx(i->second, 0, &length);
+        if (data && length > 0)
+        {
+          universe = data;
+          universeCount = static_cast<size_t>(length);
+        }
+      }
+
+      error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, args, argsCount, universe, universeCount, &packet);
+    }
     else
-      error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, args, argsCount, /*universe*/ nullptr, /*unvierseCount*/ 0, &packet);
+      error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, args, argsCount, /*universe*/ nullptr, /*universeCount*/ 0, &packet);
 
     if (error.isEmpty())
       return true;
@@ -1647,7 +1819,7 @@ bool RouterThread::MakeOSCPacket(const EosAddr &addr, Protocol protocol, const Q
     return false;
   }
 
-  MakeSendPath(addr, protocol, srcPath, dst.path, args, argsCount, sendPath);
+  MakeSendPath(artnet, addr, protocol, srcPath, dst.path, args, argsCount, sendPath);
   if (!sendPath.isEmpty())
   {
     size_t oscPacketSize = 0;
@@ -1680,7 +1852,7 @@ bool RouterThread::MakeOSCPacket(const EosAddr &addr, Protocol protocol, const Q
     {
       OSCPacketWriter oscPacket(sendPath.toUtf8().constData());
 
-      if (protocol != Protocol::ksACN)
+      if (protocol != Protocol::ksACN && protocol != Protocol::kArtNet)
       {
         if (dst.hasAnyTransforms())
         {
@@ -2029,6 +2201,107 @@ bool RouterThread::SendsACN(sACN &sacn, const EosRouteDst &dst, EosPacket &osc)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool RouterThread::SendArtNet(ArtNet &artnet, const EosRouteDst &dst, EosPacket &osc)
+{
+  if (!artnet.server)
+    return false;
+
+  uint8_t universeNumber = static_cast<uint8_t>(dst.addr.port);
+  if (universeNumber == 0)
+    return false;
+
+  char *data = osc.GetData();
+  if (!data || osc.GetSize() < 1)
+    return false;
+
+  // find osc path null terminator
+  bool sent = false;
+  for (int i = 0; i < osc.GetSize(); i++)
+  {
+    if (data[i] == 0)
+    {
+      size_t argCount = 0xffffffff;
+      OSCArgument *args = OSCArgument::GetArgs(&data[i], static_cast<size_t>(osc.GetSize()), argCount);
+      if (args)
+      {
+        if (argCount != 0)
+        {
+          int offset = 0;
+
+          QString path = QString::fromUtf8(data[0] == '/' ? &data[1] : &data[0]);
+          QStringList parts = path.split(QLatin1Char('/'));
+          for (int part = 0; part < parts.size(); ++part)
+          {
+            if (parts[part] == QLatin1String("offset"))
+            {
+              int numberPart = part + 1;
+              if (numberPart < parts.size())
+              {
+                bool ok = false;
+                int n = parts[numberPart].toInt(&ok);
+                if (ok)
+                {
+                  offset = std::max(0, n - 1);
+                  ++part;
+                }
+              }
+            }
+          }
+
+          if (offset < ARTNET_DMX_LENGTH)
+          {
+            bool dirty = false;
+
+            ArtNetSendUniverse *universe = nullptr;
+            ARTNET_SEND_UNIVERSE_LIST::iterator universeIter = artnet.output.find(universeNumber);
+            if (universeIter == artnet.output.end())
+            {
+              m_PrivateLog.AddInfo(QStringLiteral("created ArtNet dmx output universe %1").arg(universeNumber).toUtf8().constData());
+              universe = &artnet.output[universeNumber];
+              dirty = true;
+            }
+            else
+              universe = &universeIter->second;
+
+            // update dmx
+            for (size_t arg = 0; arg < argCount; ++arg)
+            {
+              int channel = offset + static_cast<int>(arg);
+              if (channel >= UNIVERSE_SIZE)
+                break;
+
+              int n = 0;
+              if (!args[arg].GetInt(n))
+                n = 0;
+
+              uint1 value = static_cast<uint1>(std::clamp(n, 0, 255));
+              if (universe->dmx[channel] != value)
+              {
+                universe->dmx[channel] = value;
+                dirty = true;
+              }
+            }
+
+            if (dirty)
+            {
+              if (artnet_raw_send_dmx(artnet.server, universeNumber, static_cast<int16_t>(universe->dmx.size()), universe->dmx.data()) == ARTNET_EOK)
+                sent = true;
+            }
+          }
+        }
+
+        delete[] args;
+      }
+
+      break;
+    }
+  }
+
+  return sent;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute)
 {
   for (EosTcpServerThread::CONNECTION_Q::const_iterator i = tcpConnectionQ.begin(); i != tcpConnectionQ.end(); i++)
@@ -2097,9 +2370,9 @@ bool RouterThread::ApplyTransform(OSCArgument &arg, const EosRouteDst &dst, OSCP
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::MakeSendPath(const EosAddr &addr, Protocol protocol, const QString &srcPath, const QString &dstPath, const OSCArgument *args, size_t argsCount, QString &sendPath)
+void RouterThread::MakeSendPath(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const QString &dstPath, const OSCArgument *args, size_t argsCount, QString &sendPath)
 {
-  if (dstPath.isEmpty() && protocol != Protocol::ksACN)
+  if (dstPath.isEmpty() && protocol != Protocol::ksACN && protocol != Protocol::kArtNet)
   {
     sendPath = srcPath;
   }
@@ -2107,8 +2380,13 @@ void RouterThread::MakeSendPath(const EosAddr &addr, Protocol protocol, const QS
   {
     sendPath = dstPath;
 
-    if (sendPath.isEmpty() && protocol == Protocol::ksACN)
-      sendPath = QStringLiteral("/sacn=%1");
+    if (sendPath.isEmpty())
+    {
+      if (protocol == Protocol::ksACN)
+        sendPath = QStringLiteral("/sacn=%1");
+      else if (protocol == Protocol::kArtNet)
+        sendPath = QStringLiteral("/artnet=%1");
+    }
 
     if (sendPath.contains('%'))
     {
@@ -2169,13 +2447,36 @@ void RouterThread::MakeSendPath(const EosAddr &addr, Protocol protocol, const QS
                     srcPathIndex -= srcPathParts.size();
                     uint8_t value = 0;
 
-                    QMutexLocker locker(&m_sACNRecv.mutex);
-                    UNIVERSE_LIST::const_iterator universeIter = m_sACNRecv.merged.find(addr.port);
-                    if (universeIter != m_sACNRecv.merged.end())
+                    if (srcPathIndex >= 0)
                     {
-                      const Universe &universe = universeIter->second;
-                      if (srcPathIndex >= 0 && static_cast<size_t>(srcPathIndex) < universe.dmx.size())
-                        value = universe.dmx[srcPathIndex];
+                      QMutexLocker locker(&m_sACNRecv.mutex);
+                      UNIVERSE_LIST::const_iterator universeIter = m_sACNRecv.merged.find(addr.port);
+                      if (universeIter != m_sACNRecv.merged.end())
+                      {
+                        const Universe &universe = universeIter->second;
+                        if (static_cast<size_t>(srcPathIndex) < universe.dmx.size())
+                          value = universe.dmx[srcPathIndex];
+                      }
+                    }
+
+                    insertStr = QString::number(static_cast<ushort>(value));
+                  }
+                  else if (protocol == Protocol::kArtNet)
+                  {
+                    srcPathIndex -= srcPathParts.size();
+                    uint8_t value = 0;
+
+                    if (srcPathIndex >= 0)
+                    {
+                      uint8_t universeNumber = static_cast<uint8_t>(addr.port);
+                      ARTNET_RECV_UNIVERSE_LIST::const_iterator universeIter = artnet.inputs.find(universeNumber);
+                      if (universeIter != artnet.inputs.end())
+                      {
+                        int length = 0;
+                        uint8_t *data = artnet_read_dmx(universeIter->second, 0, &length);
+                        if (data && srcPathIndex < length)
+                          value = data[srcPathIndex];
+                      }
                     }
 
                     insertStr = QString::number(static_cast<ushort>(value));
@@ -2328,8 +2629,9 @@ void RouterThread::run()
   TCP_SERVER_THREADS tcpServerThreads;
   ROUTES_BY_PORT routesByPort;
   ROUTES_BY_PORT routesBysACNUniverse;
+  ROUTES_BY_PORT routesByArtNetUniverse;
   DESTINATIONS_LIST routingDestinationList;
-  EosUdpInThread::RECV_PORT_Q sACNRecvQ;
+  EosUdpInThread::RECV_PORT_Q dmxRecvQ;
   EosUdpInThread::RECV_Q recvQ;
   EosTcpServerThread::CONNECTION_Q tcpConnectionQ;
   EosLog::LOG_Q tempLogQ;
@@ -2337,27 +2639,45 @@ void RouterThread::run()
   OSCParser oscBundleParser;
   oscBundleParser.SetRoot(new OSCBundleMethod());
 
-  BuildRoutes(routesByPort, routesBysACNUniverse, udpInThreads, udpOutThreads, tcpClientThreads, tcpServerThreads);
+  BuildRoutes(routesByPort, routesBysACNUniverse, routesByArtNetUniverse, udpInThreads, udpOutThreads, tcpClientThreads, tcpServerThreads);
 
   sACN sacn;
   BuildsACN(routesByPort, routesBysACNUniverse, sacn);
+
+  ArtNet artnet;
+  BuildArtNet(routesByPort, routesByArtNetUniverse, artnet);
 
   while (m_Run)
   {
     MuteAll muteAll = GetMuteAll();
 
     // sACN input
-    RecvsACN(sacn, sACNRecvQ);
+    RecvsACN(sacn, dmxRecvQ);
 
     if (!muteAll.incoming && !muteAll.outgoing)
     {
-      EosAddr sACNAddr;
-      for (size_t i = 0; i < sACNRecvQ.size(); ++i)
+      EosAddr dmxAddr;
+      for (size_t i = 0; i < dmxRecvQ.size(); ++i)
       {
-        EosUdpInThread::sRecvPortPacket &sACNPacket = sACNRecvQ[i];
-        sACNAddr.fromUInt(sACNPacket.p.ip);
-        sACNAddr.port = sACNPacket.port;
-        ProcessRecvPacket(sacn, routesBysACNUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, sACNAddr, Protocol::ksACN, sACNPacket.p);
+        EosUdpInThread::sRecvPortPacket &dmxPacket = dmxRecvQ[i];
+        dmxAddr.fromUInt(dmxPacket.p.ip);
+        dmxAddr.port = dmxPacket.port;
+        ProcessRecvPacket(sacn, artnet, routesBysACNUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, dmxAddr, Protocol::ksACN, dmxPacket.p);
+      }
+    }
+
+    // ArtNet input
+    RecvArtNet(artnet, dmxRecvQ);
+
+    if (!muteAll.incoming && !muteAll.outgoing)
+    {
+      EosAddr dmxAddr;
+      for (size_t i = 0; i < dmxRecvQ.size(); ++i)
+      {
+        EosUdpInThread::sRecvPortPacket &dmxPacket = dmxRecvQ[i];
+        dmxAddr.fromUInt(dmxPacket.p.ip);
+        dmxAddr.port = dmxPacket.port;
+        ProcessRecvPacket(sacn, artnet, routesByArtNetUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, dmxAddr, Protocol::kArtNet, dmxPacket.p);
       }
     }
 
@@ -2376,7 +2696,7 @@ void RouterThread::run()
         SetItemActivity(thread->GetItemStateTableId());
 
       if (!muteAll.outgoing)
-        ProcessRecvQ(sacn, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
+        ProcessRecvQ(sacn, artnet, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
 
       if (!running)
       {
@@ -2428,7 +2748,7 @@ void RouterThread::run()
         SetItemActivity(thread->GetItemStateTableId());
 
       if (!muteAll.outgoing)
-        ProcessRecvQ(sacn, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
+        ProcessRecvQ(sacn, artnet, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
 
       if (!running)
       {
@@ -2526,6 +2846,7 @@ void RouterThread::run()
 
   m_ItemStateTable.Deactivate();
 
+  DestroyArtNet(artnet);
   DestroysACN(sacn);
 
   delete m_PSNEncoder;
@@ -2675,6 +2996,34 @@ void RouterThread::RecvsACN(sACN &sacn, EosUdpInThread::RECV_PORT_Q &recvQ)
 
   m_PrivateLog.AddLog(m_sACNRecv.log);
   m_sACNRecv.log.Clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void RouterThread::RecvArtNet(ArtNet &artnet, EosUdpInThread::RECV_PORT_Q &recvQ)
+{
+  recvQ.clear();
+
+  for (ARTNET_RECV_UNIVERSE_LIST::const_iterator inputIter = artnet.inputs.begin(); inputIter != artnet.inputs.end(); ++inputIter)
+    artnet_read(inputIter->second, 0);
+
+  for (ARTNET_DIRTY_LIST::const_iterator dirtyIter = artnet.dirty.begin(); dirtyIter != artnet.dirty.end(); ++dirtyIter)
+  {
+    artnet_node node = *dirtyIter;
+
+    int universeNumber = artnet_get_universe_addr(node, 0, ARTNET_OUTPUT_PORT);
+    if (universeNumber < 0)
+      continue;
+
+    unsigned int ip = 0;
+    ARTNET_NODE_IP_LIST::const_iterator ipIter = artnet.inputIPs.find(*dirtyIter);
+    if (ipIter != artnet.inputIPs.end())
+      ip = ipIter->second;
+
+    recvQ.push_back(EosUdpInThread::sRecvPortPacket(static_cast<uint16_t>(universeNumber), nullptr, 0, ip));
+  }
+
+  artnet.dirty.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

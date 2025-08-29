@@ -52,7 +52,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\EosSyncLib\EosSyncLib;..\psn;..\sACN\ACN\StreamingACN\Client;..\sACN\ACN\StreamingACN\Client\Src;..\sACN\ACN\StreamingACN\Client\Windows;..\sACN\ACN\StreamingACN\Common;..\sACN\ACN\StreamingACN\Server;..\sACN\ACN\StreamingACN\Server\Src;..\sACN\ACN\StreamingACN\Server\Windows;..\sACN\ACN\VHD;..\sACN\Network_Common\ACNTypes;..\sACN\Network_Common\AsyncSocket;..\sACN\Network_Common\AsyncSocket\Src;..\sACN\Network_Common\AsyncSocket\Windows;..\sACN\Network_Common\defpack\Windows;..\sACN\Network_Common\ObjectSync\Windows;..\sACN\Network_Common\Tock;..\sACN\Onyx_Common\Windows;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\;..\..\EosSyncLib\EosSyncLib;..\psn;..\sACN\ACN\StreamingACN\Client;..\sACN\ACN\StreamingACN\Client\Src;..\sACN\ACN\StreamingACN\Client\Windows;..\sACN\ACN\StreamingACN\Common;..\sACN\ACN\StreamingACN\Server;..\sACN\ACN\StreamingACN\Server\Src;..\sACN\ACN\StreamingACN\Server\Windows;..\sACN\ACN\VHD;..\sACN\Network_Common\ACNTypes;..\sACN\Network_Common\AsyncSocket;..\sACN\Network_Common\AsyncSocket\Src;..\sACN\Network_Common\AsyncSocket\Windows;..\sACN\Network_Common\defpack\Windows;..\sACN\Network_Common\ObjectSync\Windows;..\sACN\Network_Common\Tock;..\sACN\Onyx_Common\Windows;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4127;4996;4512</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
@@ -78,7 +78,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\EosSyncLib\EosSyncLib;..\psn;..\sACN\ACN\StreamingACN\Client;..\sACN\ACN\StreamingACN\Client\Src;..\sACN\ACN\StreamingACN\Client\Windows;..\sACN\ACN\StreamingACN\Common;..\sACN\ACN\StreamingACN\Server;..\sACN\ACN\StreamingACN\Server\Src;..\sACN\ACN\StreamingACN\Server\Windows;..\sACN\ACN\VHD;..\sACN\Network_Common\ACNTypes;..\sACN\Network_Common\AsyncSocket;..\sACN\Network_Common\AsyncSocket\Src;..\sACN\Network_Common\AsyncSocket\Windows;..\sACN\Network_Common\defpack\Windows;..\sACN\Network_Common\ObjectSync\Windows;..\sACN\Network_Common\Tock;..\sACN\Onyx_Common\Windows;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\;..\..\EosSyncLib\EosSyncLib;..\psn;..\sACN\ACN\StreamingACN\Client;..\sACN\ACN\StreamingACN\Client\Src;..\sACN\ACN\StreamingACN\Client\Windows;..\sACN\ACN\StreamingACN\Common;..\sACN\ACN\StreamingACN\Server;..\sACN\ACN\StreamingACN\Server\Src;..\sACN\ACN\StreamingACN\Server\Windows;..\sACN\ACN\VHD;..\sACN\Network_Common\ACNTypes;..\sACN\Network_Common\AsyncSocket;..\sACN\Network_Common\AsyncSocket\Src;..\sACN\Network_Common\AsyncSocket\Windows;..\sACN\Network_Common\defpack\Windows;..\sACN\Network_Common\ObjectSync\Windows;..\sACN\Network_Common\Tock;..\sACN\Onyx_Common\Windows;$(QTOSCROUTER)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4127;4996;4512</DisableSpecificWarnings>
       <PreprocessorDefinitions>WIN32;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <TreatSpecificWarningsAsErrors>4715</TreatSpecificWarningsAsErrors>
@@ -110,6 +110,12 @@
     <ClCompile Include="..\..\EosSyncLib\EosSyncLib\EosUdp.cpp" />
     <ClCompile Include="..\..\EosSyncLib\EosSyncLib\EosUdp_Win.cpp" />
     <ClCompile Include="..\..\EosSyncLib\EosSyncLib\OSCParser.cpp" />
+    <ClCompile Include="..\artnet\artnet.c" />
+    <ClCompile Include="..\artnet\misc.c" />
+    <ClCompile Include="..\artnet\network.c" />
+    <ClCompile Include="..\artnet\receive.c" />
+    <ClCompile Include="..\artnet\tod.c" />
+    <ClCompile Include="..\artnet\transmit.c" />
     <ClCompile Include="..\sACN\ACN\StreamingACN\Client\Src\StreamClient.cpp" />
     <ClCompile Include="..\sACN\ACN\StreamingACN\Client\Windows\WinStreamClient.cpp" />
     <ClCompile Include="..\sACN\ACN\StreamingACN\Common\streamcommon.cpp" />
@@ -135,6 +141,12 @@
   <ItemGroup>
     <ClInclude Include="..\..\EosSyncLib\EosSyncLib\EosUdp.h" />
     <ClInclude Include="..\..\EosSyncLib\EosSyncLib\EosUdp_Win.h" />
+    <ClInclude Include="..\artnet\artnet.h" />
+    <ClInclude Include="..\artnet\common.h" />
+    <ClInclude Include="..\artnet\misc.h" />
+    <ClInclude Include="..\artnet\packets.h" />
+    <ClInclude Include="..\artnet\private.h" />
+    <ClInclude Include="..\artnet\tod.h" />
     <ClInclude Include="..\psn\psn_decoder.hpp" />
     <ClInclude Include="..\psn\psn_decoder_impl.hpp" />
     <ClInclude Include="..\psn\psn_defs.hpp" />

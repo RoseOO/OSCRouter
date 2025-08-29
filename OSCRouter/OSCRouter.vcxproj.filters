@@ -40,6 +40,15 @@
     <Filter Include="sACN\Source Files">
       <UniqueIdentifier>{c36de797-2aa3-47b6-a655-3d33cf89fdf4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="artnet">
+      <UniqueIdentifier>{d68a64f7-1fc6-4ecb-acbb-d97ab7e0b1e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="artnet\Header Files">
+      <UniqueIdentifier>{396d948e-a6a2-4135-bd4f-edfff37743d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="artnet\Source FIles">
+      <UniqueIdentifier>{626293fc-f7be-4403-95e9-268e09a5f117}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -131,6 +140,24 @@
     </ClCompile>
     <ClCompile Include="..\sACN\Network_Common\Tock\Windows\tock.cpp">
       <Filter>sACN\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\artnet\artnet.c">
+      <Filter>artnet\Source FIles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\artnet\misc.c">
+      <Filter>artnet\Source FIles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\artnet\network.c">
+      <Filter>artnet\Source FIles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\artnet\receive.c">
+      <Filter>artnet\Source FIles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\artnet\tod.c">
+      <Filter>artnet\Source FIles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\artnet\transmit.c">
+      <Filter>artnet\Source FIles</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -271,6 +298,24 @@
     </ClInclude>
     <ClInclude Include="Version.h">
       <Filter>OSCRouter\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\artnet\artnet.h">
+      <Filter>artnet\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\artnet\common.h">
+      <Filter>artnet\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\artnet\misc.h">
+      <Filter>artnet\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\artnet\packets.h">
+      <Filter>artnet\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\artnet\private.h">
+      <Filter>artnet\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\artnet\tod.h">
+      <Filter>artnet\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

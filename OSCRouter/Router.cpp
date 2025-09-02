@@ -1489,7 +1489,13 @@ void RouterThread::BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
       artnet_set_short_name(client, "OSCRouter");
       artnet_set_long_name(client, "OSCRouter");
       artnet_set_port_type(client, 0, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX);
-      artnet_set_port_addr(client, 0, ARTNET_OUTPUT_PORT, universeNumber);
+      if (universeNumber > 16)
+      {
+        artnet_set_subnet_addr(client, (universeNumber >> 4) & 0xf);
+        artnet_set_port_addr(client, 0, ARTNET_OUTPUT_PORT, universeNumber & 0xf);
+      }
+      else
+        artnet_set_port_addr(client, 0, ARTNET_OUTPUT_PORT, universeNumber);
       artnet_set_handler(client, ARTNET_RECV_HANDLER, ArtNetRecv, &artnet);
 
       if (artnet_set_dmx_handler(client, ArtNetUniverseData, &artnet) != ARTNET_EOK)

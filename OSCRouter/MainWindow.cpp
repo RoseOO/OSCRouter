@@ -1205,13 +1205,14 @@ ProtocolComboBox::ProtocolComboBox(size_t row, Protocol protocol, QWidget* paren
 {
   setToolTip(tr("Protocol"));
 
-  protocol = SanitizedProtocol(static_cast<int>(protocol));
-  for (int i = 0; i < static_cast<int>(Protocol::kCount); ++i)
-  {
-    addItem(ProtocolName(static_cast<Protocol>(i)), i);
-    if (static_cast<Protocol>(i) == protocol)
-      setCurrentIndex(count() - 1);
-  }
+  addItem(ProtocolName(Protocol::kOSC), static_cast<int>(Protocol::kOSC));
+  addItem(ProtocolName(Protocol::ksACN), static_cast<int>(Protocol::ksACN));
+  addItem(ProtocolName(Protocol::kArtNet), static_cast<int>(Protocol::kArtNet));
+  addItem(ProtocolName(Protocol::kPSN), static_cast<int>(Protocol::kPSN));
+
+  int index = findData(static_cast<int>(SanitizedProtocol(static_cast<int>(protocol))));
+  if (index >= 0)
+    setCurrentIndex(index);
 
   connect(this, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ProtocolComboBox::onCurrentIndexChanged);
 }
@@ -1377,7 +1378,7 @@ QString RoutingWidget::HeaderForCol(Col col)
     case Col::kOutPort: return tr("Port");
 
     case Col::kInProtocol:
-    case Col::kOutProtocol: return tr("Prot");
+    case Col::kOutProtocol: return tr("Protocol");
 
     case Col::kInPath:
     case Col::kOutPath: return tr("Path");
@@ -1528,7 +1529,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.outIP);
 
   row.outPort = new LineEdit(m_Cols->widget(col));
-  row.outPort->setText((route.dst.addr.port == 0) ? QString() : QString::number(route.dst.addr.port));
+  row.outPort->setText((route.dst.addr.port == 0 && route.dst.protocol != Protocol::kArtNet) ? QString() : QString::number(route.dst.addr.port));
   AddCol(col++, row.outPort);
 
   row.outProtocol = new ProtocolComboBox(id, route.dst.protocol, m_Cols->widget(col));

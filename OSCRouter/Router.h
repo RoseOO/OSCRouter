@@ -543,7 +543,7 @@ protected:
                                  TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket);
   virtual bool MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet);
   virtual bool MakePSNPacket(EosPacket &osc, EosPacket &psn);
-  virtual bool SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Protocol protocol, const EosRouteDst &dst, EosPacket &osc);
+  virtual bool SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Protocol protocol, const sRouteDst &routeDst, EosPacket &osc);
   virtual bool SendArtNet(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const EosRouteDst &dst, EosPacket &osc);
   virtual void FlushArtNet(ArtNet &artnet);
   virtual void ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute);
@@ -553,8 +553,9 @@ protected:
   virtual MuteAll GetMuteAll();
   virtual bool IsRouteMuted(ItemStateTable::ID id);
   virtual void SetItemState(ItemStateTable::ID id, ItemState::EnumState state);
-  virtual void SetItemState(const ROUTES_BY_IP &routesByIp, ItemState::EnumState state);
-  virtual void SetItemState(const ROUTES_BY_PATH &routesByPath, ItemState::EnumState state);
+  virtual void SetItemState(const ROUTES_BY_PORT &routesByPort, Protocol dstProtocol, ItemState::EnumState state);
+  virtual void SetItemState(const ROUTES_BY_IP &routesByIp, Protocol dstProtocol, ItemState::EnumState state);
+  virtual void SetItemState(const ROUTES_BY_PATH &routesByPath, Protocol dstProtocol, ItemState::EnumState state);
   virtual void SetItemActivity(ItemStateTable::ID id);
   virtual void DestroysACN(sACN &sacn);
   virtual void DestroyArtNet(ArtNet &artnet);

@@ -22,6 +22,7 @@
 #include "EosTimer.h"
 #include "EosUdp.h"
 #include "EosTcp.h"
+#include "Version.h"
 #include "artnet/packets.h"
 #include "streamcommon.h"
 #include <psn_lib.hpp>
@@ -1509,8 +1510,8 @@ void RouterThread::BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
         continue;
       }
 
-      artnet_set_short_name(client, "OSCRouter");
-      artnet_set_long_name(client, "OSCRouter");
+      artnet_set_short_name(client, VER_PRODUCTNAME_STR);
+      artnet_set_long_name(client, VER_PRODUCTNAME_STR);
       artnet_set_port_type(client, 0, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX);
       if (universeNumber > 16)
       {
@@ -1551,8 +1552,8 @@ void RouterThread::BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
       m_PrivateLog.AddInfo(QLatin1String("ArtNet server created").toUtf8().constData());
 
       artnet_set_node_type(artnet.server, ARTNET_RAW);
-      artnet_set_short_name(artnet.server, "OSCRouter");
-      artnet_set_long_name(artnet.server, "OSCRouter");
+      artnet_set_short_name(artnet.server, VER_PRODUCTNAME_STR);
+      artnet_set_long_name(artnet.server, VER_PRODUCTNAME_STR);
 
       if (artnet_start(artnet.server) != ARTNET_EOK)
       {
@@ -2121,7 +2122,6 @@ bool RouterThread::SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Pro
 
     static const uint1 kCIDBytes[] = {0x37, 0x6b, 0xa8, 0x33, 0x93, 0xf1, 0x4c, 0xcf, 0x91, 0xc0, 0xe1, 0x4c, 0xaf, 0x76, 0xe2, 0xd4};
     static const CID kCID(kCIDBytes);
-    static const char *kName = "OSCRouter";
 
     bool dirty = false;
 
@@ -2134,8 +2134,8 @@ bool RouterThread::SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Pro
       // create dmx
       uint1 *pslots = nullptr;
       uint handle = 0;
-      if (sacn.server->CreateUniverse(kCID, sacn.GetNetIFList(), sacn.GetNetIFListSize(), kName, static_cast<uint1>(priority), 0, 0, STARTCODE_DMX, universeNumber, static_cast<uint2>(UNIVERSE_SIZE),
-                                      pslots, handle))
+      if (sacn.server->CreateUniverse(kCID, sacn.GetNetIFList(), sacn.GetNetIFListSize(), VER_PRODUCTNAME_STR, static_cast<uint1>(priority), 0, 0, STARTCODE_DMX, universeNumber,
+                                      static_cast<uint2>(UNIVERSE_SIZE), pslots, handle))
       {
         universe.priority = priority;
         universe.dmx.handle = handle;
@@ -2156,7 +2156,7 @@ bool RouterThread::SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Pro
           // create perChannelPriority
           uint1 *pslots = nullptr;
           uint handle = 0;
-          if (sacn.server->CreateUniverse(kCID, sacn.GetNetIFList(), sacn.GetNetIFListSize(), kName, static_cast<uint1>(priority), 0, 0, STARTCODE_PRIORITY, universeNumber,
+          if (sacn.server->CreateUniverse(kCID, sacn.GetNetIFList(), sacn.GetNetIFListSize(), VER_PRODUCTNAME_STR, static_cast<uint1>(priority), 0, 0, STARTCODE_PRIORITY, universeNumber,
                                           static_cast<uint2>(UNIVERSE_SIZE), pslots, handle))
           {
             universe.channelPriority.handle = handle;
@@ -2741,7 +2741,7 @@ void RouterThread::run()
   UpdateLog();
 
   m_ScriptEngine = new ScriptEngine();
-  m_PSNEncoder = new psn::psn_encoder("OSCRouter");
+  m_PSNEncoder = new psn::psn_encoder(VER_PRODUCTNAME_STR);
   m_PSNEncoderTimer.invalidate();
 
   UDP_IN_THREADS udpInThreads;

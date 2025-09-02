@@ -2427,7 +2427,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
 
 MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::WindowFlags f /*=Qt::WindowFlags()*/)
   : QWidget(parent, f)
-  , m_Settings("ETC", "OSCRouter")
+  , m_Settings("ETC", QLatin1String(VER_PRODUCTNAME_STR))
   , m_FileDepth(10000)
   , m_Unsaved(false)
   , m_RouterThread(0)
@@ -2537,7 +2537,8 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
   m_LogWidget->setPalette(pal);
   logLayout->addWidget(m_LogWidget, 0, 0);
 
-  m_Log.AddInfo(QString("OSCRouter %1.%2").arg(OSCROUTER_VERSION_MAJOR).arg(OSCROUTER_VERSION_MINOR).toUtf8().constData());
+  QString version = QLatin1String(VER_PRODUCTNAME_STR) + QLatin1Char(' ') + QLatin1String(VER_PRODUCTVERSION_STR);
+  m_Log.AddInfo(version.toUtf8().constData());
 
   m_RoutingWidget->LoadRoutes(Router::ROUTES(), ItemStateTable());
   m_TcpWidget->LoadConnections(Router::CONNECTIONS());
@@ -2708,7 +2709,7 @@ void MainWindow::GetPersistentSavePath(QString& path) const
 
 void MainWindow::UpdateWindowTitle()
 {
-  QString title(QStringLiteral("OSCRouter %1.%2").arg(OSCROUTER_VERSION_MAJOR).arg(OSCROUTER_VERSION_MINOR));
+  QString title = QStringLiteral("%1 %2.%3.%4").arg(VER_PRODUCTNAME_STR).arg(OSCROUTER_VERSION_MAJOR).arg(OSCROUTER_VERSION_MINOR).arg(OSCROUTER_VERSION_PATCH);
   if (!m_FilePath.isEmpty())
   {
     title.append(" - ");
@@ -2768,7 +2769,7 @@ bool MainWindow::SaveFile(const QString& path)
     return true;
   }
   else
-    QMessageBox::critical(this, tr("OSCRouter"), tr("Unable to save file \"%1\"").arg(path));
+    QMessageBox::critical(this, QLatin1String(VER_PRODUCTNAME_STR), tr("Unable to save file \"%1\"").arg(path));
 
   return false;
 }
@@ -2872,11 +2873,11 @@ void MainWindow::onOpenFile()
     dir = QFileInfo(lastFile).absolutePath();
   if (dir.isEmpty() || !QFileInfo(dir).exists())
     dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-  QString path = QFileDialog::getOpenFileName(this, tr("Open"), dir, tr("OSCRouter File (*.txt *.osc.txt)"));
+  QString path = QFileDialog::getOpenFileName(this, tr("Open"), dir, QLatin1String(VER_PRODUCTNAME_STR) + QLatin1Char(' ') + tr("File (*.txt *.osc.txt)"));
   if (!path.isEmpty())
   {
     if (!LoadFile(path))
-      QMessageBox::critical(this, tr("OSCRouter"), tr("Unable to open file \"%1\"").arg(path));
+      QMessageBox::critical(this, QLatin1String(VER_PRODUCTNAME_STR), tr("Unable to open file \"%1\"").arg(path));
   }
 }
 
@@ -2896,7 +2897,7 @@ void MainWindow::onSaveAsFile()
     dir = QFileInfo(lastFile).absolutePath();
   if (dir.isEmpty() || !QFileInfo(dir).exists())
     dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-  QString path = QFileDialog::getSaveFileName(this, tr("Save"), dir, tr("OSCRouter File (*.osc.txt)"));
+  QString path = QFileDialog::getSaveFileName(this, tr("Save"), dir, QLatin1String(VER_PRODUCTNAME_STR) + QLatin1Char(' ') + tr("File (*.osc.txt)"));
   if (!path.isEmpty())
     SaveFile(path);
 }
@@ -2934,7 +2935,7 @@ bool MainWindow::ResolveUnsaved()
 {
   if (m_Unsaved)
   {
-    QMessageBox mb(QMessageBox::Question, tr("OSCRouter"), tr("Do you want to save changes?"), QMessageBox::NoButton, this);
+    QMessageBox mb(QMessageBox::Question, QLatin1String(VER_PRODUCTNAME_STR), tr("Do you want to save changes?"), QMessageBox::NoButton, this);
     QPushButton* saveButton = mb.addButton(tr("Save"), QMessageBox::AcceptRole);
     mb.addButton(tr("Don't Save"), QMessageBox::DestructiveRole);
     QPushButton* cancelButton = mb.addButton(tr("Cancel"), QMessageBox::RejectRole);

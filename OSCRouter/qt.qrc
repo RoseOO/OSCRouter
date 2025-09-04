@@ -1,6 +1,7 @@
 <RCC>
 <qresource prefix="/qt/etc">    
   <file>qt.conf</file>
+  <file>Icon.png</file>
   <file>NetworkOn.svg</file>
   <file>NetworkOff.svg</file>
   <file>CheckBoxOn.svg</file>

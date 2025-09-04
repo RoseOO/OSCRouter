@@ -2129,8 +2129,8 @@ void RoutingWidget::onHeaderHelpClicked(size_t id)
     QPalette pal = m_Help.edit->palette();
     pal.setColor(QPalette::Base, pal.color(QPalette::Window));
     m_Help.edit->setPalette(pal);
-    layout->addWidget(m_Help.edit);
     m_Help.edit->setReadOnly(true);
+    layout->addWidget(m_Help.edit);
   }
 
   m_Help.edit->setText(GetHelpText(static_cast<Col>(id), Protocol::kInvalid, Protocol::kInvalid, /*script*/ true));
@@ -2528,6 +2528,10 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
   log->addAction(tr("&Clear"), this, &MainWindow::onClearLog);
   log->addAction(tr("&Open"), this, &MainWindow::onOpenLog);
 
+  QMenu* help = menu->addMenu(tr("&Help"));
+  help->addAction(tr("&View Help"), this, &MainWindow::onViewHelp);
+  help->addAction(tr("&About"), this, &MainWindow::onAboutHelp);
+
   QSplitter* splitter = new QSplitter(Qt::Vertical, this);
   layout->addWidget(splitter, 1, 0);
 
@@ -2576,7 +2580,7 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
   UpdateWindowTitle();
 
   pal = palette();
-  pal.setColor(QPalette::Window, BG_COLOR.darker(125));
+  pal.setColor(QPalette::Window, BG_COLOR.darker(150));
   setPalette(pal);
 
   QTimer* timer = new QTimer(this);
@@ -2943,6 +2947,117 @@ void MainWindow::onOpenLog()
       m_LogStream.flush();
     QDesktopServices::openUrl(QUrl::fromLocalFile(m_LogFile.fileName()));
   }
+}
+
+void MainWindow::onViewHelp()
+{
+  if (!m_Help)
+  {
+    const QSize kPadding(20, 20);
+
+    m_Help = new QWidget(this, Qt::Tool);
+    m_Help->setContentsMargins(QMargins());
+
+    QGridLayout* windowLayout = new QGridLayout(m_Help);
+    windowLayout->setSpacing(0);
+    windowLayout->setContentsMargins(QMargins());
+    QScrollArea* scroll = new QScrollArea(m_Help);
+    windowLayout->addWidget(scroll);
+
+    QWidget* base = new QWidget(scroll);
+    scroll->setWidget(base);
+
+    QLabel* incomingLabel = new QLabel(tr("Incoming"), base);
+    QFont fnt = incomingLabel->font();
+    fnt.setPointSize(12);
+    incomingLabel->setFont(fnt);
+    incomingLabel->setAlignment(Qt::AlignCenter);
+
+    QTextEdit* incomingEdit = new QTextEdit(base);
+    incomingEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    incomingEdit->setWordWrapMode(QTextOption::NoWrap);
+    QPalette pal = incomingEdit->palette();
+    pal.setColor(QPalette::Base, DARK_BG_COLOR);
+    incomingEdit->setPalette(pal);
+    incomingEdit->setReadOnly(true);
+    incomingEdit->setText(RoutingWidget::GetHelpText(/*incoming*/ true));
+    incomingEdit->document()->adjustSize();
+    incomingEdit->resize(incomingEdit->document()->size().toSize() + kPadding);
+
+    QLabel* outgoingLabel = new QLabel(tr("Outgoing"), base);
+    outgoingLabel->setFont(incomingLabel->font());
+    outgoingLabel->setAlignment(Qt::AlignCenter);
+
+    QTextEdit* outgoingEdit = new QTextEdit(base);
+    outgoingEdit->setFont(incomingEdit->font());
+    outgoingEdit->setWordWrapMode(QTextOption::NoWrap);
+    outgoingEdit->setPalette(pal);
+    outgoingEdit->setReadOnly(true);
+    outgoingEdit->setText(RoutingWidget::GetHelpText(/*incoming*/ false));
+    outgoingEdit->document()->adjustSize();
+    outgoingEdit->resize(outgoingEdit->document()->size().toSize() + kPadding);
+
+    const int kSpacing = 6;
+    incomingLabel->setGeometry(kSpacing, kSpacing, incomingEdit->width(), incomingLabel->sizeHint().height());
+    incomingEdit->move(kSpacing, incomingLabel->geometry().bottom() + kSpacing + 1);
+    outgoingLabel->setGeometry(incomingLabel->geometry().right() + kSpacing + 1, kSpacing, outgoingEdit->width(), incomingLabel->height());
+    outgoingEdit->move(outgoingLabel->x(), incomingEdit->y());
+
+    base->resize(outgoingLabel->geometry().right() + kSpacing + 1, std::max(incomingEdit->geometry().bottom(), outgoingEdit->geometry().bottom()) + kSpacing + 1);
+
+    m_Help->resize(base->geometry().right() + kPadding.width(), m_Help->sizeHint().height());
+    m_Help->setMaximumSize(base->geometry().right() + kPadding.width(), base->geometry().bottom() + kPadding.height());
+  }
+
+  m_Help->show();
+}
+
+void MainWindow::onAboutHelp()
+{
+  if (!m_About)
+  {
+    m_About = new QWidget(this, Qt::Tool);
+
+    QGridLayout* grid = new QGridLayout(m_About);
+    int row = 0;
+
+    QLabel* icon = new QLabel(this);
+    grid->addWidget(icon, row, 0, Qt::AlignCenter);
+    icon->setPixmap(QPixmap(QStringLiteral(":/qt/etc/Icon.png")).scaledToWidth(200, Qt::SmoothTransformation));
+    ++row;
+
+    grid->addWidget(new QLabel(QLatin1String(VER_PRODUCTNAME_STR) + QLatin1Char(' ') + QLatin1String(VER_PRODUCTVERSION_STR), this), row, 0, Qt::AlignCenter);
+    ++row;
+
+    QTextBrowser* browser = new QTextBrowser(this);
+    grid->addWidget(browser, row, 0);
+    browser->setOpenExternalLinks(true);
+    browser->setWordWrapMode(QTextOption::NoWrap);
+    QPalette pal = browser->palette();
+    pal.setColor(QPalette::Base, palette().color(QPalette::Window));
+    browser->setPalette(pal);
+    browser->setText(QStringLiteral("<h2>Third Party Software</h2>"
+                                    "<b>psn-cpp</b>"
+                                    "<br>"
+                                    "Website: <a href=\"%1\">%1</a>"
+                                    "<br>"
+                                    "License: The MIT License (MIT)"
+                                    "<br>"
+                                    "Copyright (c) 2014 VYV Corporation"
+                                    "<br>"
+                                    "<br>"
+                                    "<b>libartnet</b>"
+                                    "<br>"
+                                    "Website: <a href=\"%2\">%2</a>"
+                                    "<br>"
+                                    "License: LGPL-2.1 license"
+                                    "<br>"
+                                    "Copyright (C) 2004-2007 Simon Newton")
+                         .arg(QLatin1String("https://github.com/vyv/psn-cpp"))
+                         .arg(QLatin1String("https://github.com/OpenLightingProject/libartnet")));
+  }
+
+  m_About->show();
 }
 
 void MainWindow::closeEvent(QCloseEvent* event)

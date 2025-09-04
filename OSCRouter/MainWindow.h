@@ -404,6 +404,7 @@ public:
 
   static void StringToTransform(const QString& str, EosRouteDst::sTransform& transform);
   static void TransformToString(const EosRouteDst::sTransform& transform, QString& str);
+  static QString GetHelpText(bool incoming) { return GetHelpText(incoming ? Col::kInPath : Col::kOutPath, Protocol::kInvalid, Protocol::kInvalid, /*script*/ true); }
 
 signals:
   void muteToggled(size_t id, bool checked);
@@ -553,6 +554,8 @@ private slots:
   void onSaveAsFile();
   void onClearLog();
   void onOpenLog();
+  void onViewHelp();
+  void onAboutHelp();
   void onApplyClicked(bool checked);
   void onMuteToggled(bool incoming, bool checked);
   void onMuteRouteToggled(size_t id, bool checked);
@@ -576,6 +579,8 @@ private:
   QString m_FilePath;
   bool m_Unsaved;
   bool m_DisableSystemIdle;
+  QWidget* m_Help = nullptr;
+  QWidget* m_About = nullptr;
 
   void Shutdown();
   void GetPersistentSavePath(QString& path) const;

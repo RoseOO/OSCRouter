@@ -35,6 +35,7 @@
 #define CONNECT_COLOR QColor(105, 92, 152)
 #define ACTIVITY_COLOR QColor(200, 200, 200)
 #define BG_COLOR QColor(40, 40, 40)
+#define DARK_BG_COLOR QColor(20, 20, 20)
 
 #ifdef WIN32
 #include <Winsock2.h>

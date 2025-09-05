@@ -95,7 +95,7 @@ void LogWidget::Log(EosLog::LOG_Q &logQ)
         case EosLog::LOG_MSG_TYPE_ERROR: line.color = ERROR_COLOR; break;
         case EosLog::LOG_MSG_TYPE_RECV: line.color = RECV_COLOR; break;
         case EosLog::LOG_MSG_TYPE_SEND: line.color = SEND_COLOR; break;
-        default: line.color = palette().color(QPalette::Text); break;
+        default: line.color = palette().color(QPalette::Text).darker(125); break;
       }
     }
     else
@@ -186,10 +186,10 @@ void LogWidget::UpdateHScrollBar()
   {
     m_HScrollBar->setMinimum(0);
     m_HScrollBar->setMaximum(m_LineWidth - r.width());
-    m_HScrollBar->setEnabled(true);
+    m_HScrollBar->setVisible(true);
   }
   else
-    m_HScrollBar->setEnabled(false);
+    m_HScrollBar->setVisible(false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

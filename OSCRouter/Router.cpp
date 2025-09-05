@@ -358,7 +358,7 @@ void EosUdpInThread::QueuePacket(const QHostAddress &host, const char *data, int
 
 void EosUdpInThread::run()
 {
-  QString msg = QString("udp input %1:%2 thread started").arg(m_Addr.ip).arg(m_Addr.port);
+  QString msg = QString("udp in %1:%2 thread started").arg(m_Addr.ip).arg(m_Addr.port);
   m_PrivateLog.AddInfo(msg.toUtf8().constData());
   UpdateLog();
 
@@ -405,7 +405,7 @@ void EosUdpInThread::run()
     if (m_ReconnectDelay == 0)
       break;
 
-    msg = QString("udp input %1:%2 reconnecting in %3...").arg(m_Addr.ip).arg(m_Addr.port).arg(m_ReconnectDelay / 1000);
+    msg = QString("udp in %1:%2 reconnecting in %3...").arg(m_Addr.ip).arg(m_Addr.port).arg(m_ReconnectDelay / 1000);
     m_PrivateLog.AddInfo(msg.toUtf8().constData());
     UpdateLog();
 
@@ -416,7 +416,7 @@ void EosUdpInThread::run()
 
   delete m_PSNDecoder;
 
-  msg = QString("udp input %1:%2 thread ended").arg(m_Addr.ip).arg(m_Addr.port);
+  msg = QString("udp in %1:%2 thread ended").arg(m_Addr.ip).arg(m_Addr.port);
   m_PrivateLog.AddInfo(msg.toUtf8().constData());
   UpdateLog();
 }
@@ -529,7 +529,7 @@ void EosUdpOutThread::SetState(ItemState::EnumState state)
 
 void EosUdpOutThread::run()
 {
-  QString msg = QString("udp output %1:%2 thread started").arg(m_Addr.ip).arg(m_Addr.port);
+  QString msg = QString("udp out %1:%2 thread started").arg(m_Addr.ip).arg(m_Addr.port);
   m_PrivateLog.AddInfo(msg.toUtf8().constData());
   UpdateLog();
 
@@ -580,7 +580,7 @@ void EosUdpOutThread::run()
     if (m_ReconnectDelay == 0)
       break;
 
-    msg = QString("udp output %1:%2 reconnecting in %3...").arg(m_Addr.ip).arg(m_Addr.port).arg(m_ReconnectDelay / 1000);
+    msg = QString("udp out %1:%2 reconnecting in %3...").arg(m_Addr.ip).arg(m_Addr.port).arg(m_ReconnectDelay / 1000);
     m_PrivateLog.AddInfo(msg.toUtf8().constData());
     UpdateLog();
 
@@ -589,7 +589,7 @@ void EosUdpOutThread::run()
       msleep(10);
   } while (m_Run);
 
-  msg = QString("udp output %1:%2 thread ended").arg(m_Addr.ip).arg(m_Addr.port);
+  msg = QString("udp out %1:%2 thread ended").arg(m_Addr.ip).arg(m_Addr.port);
   m_PrivateLog.AddInfo(msg.toUtf8().constData());
   UpdateLog();
 }
@@ -1166,7 +1166,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
 
       ROUTES_BY_PORT *routes = &routesByPort;
 
-      // create udp input thread on each network interface if necessary
+      // create udp in thread on each network interface if necessary
       if (route.src.protocol == Protocol::ksACN)
       {
         routes = &routesBysACNUniverse;
@@ -1201,7 +1201,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
           route.dst.addr.port = route.src.addr.port;  // no destination port specified, so assume same port as source
       }
 
-      // create udp output thread if known dst, and not an explicit tcp client
+      // create udp out thread if known dst, and not an explicit tcp client
       if (route.dst.protocol != Protocol::ksACN && route.dst.protocol != Protocol::kArtNet && tcpClientThreads.find(route.dst.addr) == tcpClientThreads.end())
         CreateUdpOutThread(route.dst.addr, route.dstItemStateTableId, udpOutThreads);
 
@@ -3310,10 +3310,10 @@ void RouterThread::UniverseData(const CID &source, const char *source_name, cons
                                    .constData());
       }
 
-      //if (recvUniverse.ip != recvSource.ip)
+      // if (recvUniverse.ip != recvSource.ip)
       //{
-      //  char cidStr[CID::CIDSTRINGBYTES];
-      //  CID::CIDIntoString(source, cidStr);
+      //   char cidStr[CID::CIDSTRINGBYTES];
+      //   CID::CIDIntoString(source, cidStr);
 
       //  char ipStrOld[CIPAddr::ADDRSTRINGBYTES];
       //  CIPAddr old_addr;

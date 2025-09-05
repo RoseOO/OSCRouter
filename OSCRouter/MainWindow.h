@@ -245,6 +245,7 @@ public:
   void SetHeight(size_t index, int height);
   int UpdateLayout();
   bool empty() const { return m_Rows.empty(); }
+  void ResetCachedSizeHints();
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
@@ -258,6 +259,8 @@ private:
 
   typedef std::vector<Row> Rows;
   Rows m_Rows;
+  mutable QSize m_CachedSizeHint;
+  mutable QSize m_CachedMinimumSizeHint;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -321,6 +324,7 @@ private:
   QLabel* m_Headers[static_cast<int>(Col::kCount)];
   QScrollArea* m_Scroll = nullptr;
   Splitter* m_Cols = nullptr;
+  RoutingCol* m_RoutingCols[static_cast<int>(Col::kCount)];
 
   void LoadLine(const QString& line, Router::CONNECTIONS& connections);
   void AddRow(size_t id, bool remove, const Router::sConnection& connection);
@@ -511,6 +515,7 @@ private:
   QWidget* m_Headers[static_cast<int>(Col::kCount)];
   QScrollArea* m_Scroll = nullptr;
   Splitter* m_Cols = nullptr;
+  RoutingCol* m_RoutingCols[static_cast<int>(Col::kCount)];
   HelpDialog m_Help;
 
   void LoadLine(const QString& line, Router::ROUTES& routes, ItemStateTable& itemStateTable);

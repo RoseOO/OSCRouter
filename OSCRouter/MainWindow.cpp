@@ -565,52 +565,58 @@ void RoutingCol::clear()
 
 QSize RoutingCol::sizeHint() const
 {
-  QSize sh(minimumSize());
-
-  for (size_t row = 0; row < m_Rows.size(); ++row)
+  if (!m_CachedSizeHint.isValid())
   {
-    const Widgets& widgets = m_Rows[row].widgets;
-    for (size_t w = 0; w < widgets.size(); ++w)
+    m_CachedSizeHint = minimumSize();
+
+    for (size_t row = 0; row < m_Rows.size(); ++row)
     {
-      if (!widgets[w]->isHidden())
+      const Widgets& widgets = m_Rows[row].widgets;
+      for (size_t w = 0; w < widgets.size(); ++w)
       {
-        sh.setWidth(qMax(sh.width(), widgets[w]->sizeHint().width()));
-        sh.setHeight(sh.height() + static_cast<int>(Constants::kSpacing) + widgets[w]->sizeHint().height());
+        if (!widgets[w]->isHidden())
+        {
+          m_CachedSizeHint.setWidth(qMax(m_CachedSizeHint.width(), widgets[w]->sizeHint().width()));
+          m_CachedSizeHint.setHeight(m_CachedSizeHint.height() + static_cast<int>(Constants::kSpacing) + widgets[w]->sizeHint().height());
+        }
       }
     }
+
+    if (m_Rows.size() > 1)
+      m_CachedSizeHint.rheight() += static_cast<int>(Constants::kLastRowGap);
+
+    m_CachedSizeHint = m_CachedSizeHint.boundedTo(maximumSize());
   }
 
-  if (m_Rows.size() > 1)
-    sh.rheight() += static_cast<int>(Constants::kLastRowGap);
-
-  sh = sh.boundedTo(maximumSize());
-
-  return sh;
+  return m_CachedSizeHint;
 }
 
 QSize RoutingCol::minimumSizeHint() const
 {
-  QSize sh(minimumSize());
-
-  for (size_t row = 0; row < m_Rows.size(); ++row)
+  if (!m_CachedMinimumSizeHint.isValid())
   {
-    const Widgets& widgets = m_Rows[row].widgets;
-    for (size_t w = 0; w < widgets.size(); ++w)
+    m_CachedMinimumSizeHint = minimumSize();
+
+    for (size_t row = 0; row < m_Rows.size(); ++row)
     {
-      if (!widgets[w]->isHidden())
+      const Widgets& widgets = m_Rows[row].widgets;
+      for (size_t w = 0; w < widgets.size(); ++w)
       {
-        sh.setWidth(qMax(sh.width(), widgets[w]->minimumSizeHint().width()));
-        sh.setHeight(sh.height() + static_cast<int>(Constants::kSpacing) + widgets[w]->minimumSizeHint().height());
+        if (!widgets[w]->isHidden())
+        {
+          m_CachedMinimumSizeHint.setWidth(qMax(m_CachedMinimumSizeHint.width(), widgets[w]->minimumSizeHint().width()));
+          m_CachedMinimumSizeHint.setHeight(m_CachedMinimumSizeHint.height() + static_cast<int>(Constants::kSpacing) + widgets[w]->minimumSizeHint().height());
+        }
       }
     }
+
+    if (m_Rows.size() > 1)
+      m_CachedMinimumSizeHint.rheight() += static_cast<int>(Constants::kLastRowGap);
+
+    m_CachedMinimumSizeHint = m_CachedMinimumSizeHint.boundedTo(maximumSize());
   }
 
-  if (m_Rows.size() > 1)
-    sh.rheight() += static_cast<int>(Constants::kLastRowGap);
-
-  sh = sh.boundedTo(maximumSize());
-
-  return sh;
+  return m_CachedMinimumSizeHint;
 }
 
 void RoutingCol::AddWidgets(const Widgets& widgets)
@@ -659,6 +665,12 @@ int RoutingCol::UpdateLayout()
   return y;
 }
 
+void RoutingCol::ResetCachedSizeHints()
+{
+  m_CachedSizeHint = QSize();
+  m_CachedMinimumSizeHint = QSize();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 TcpWidget::TcpWidget(QWidget* parent /*= nullptr*/)
@@ -678,11 +690,11 @@ TcpWidget::TcpWidget(QWidget* parent /*= nullptr*/)
   m_Cols->show();
   for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
   {
-    RoutingCol* col = new RoutingCol(m_Cols);
-    m_Cols->addWidget(col);
+    m_RoutingCols[i] = new RoutingCol(m_Cols);
+    m_Cols->addWidget(m_RoutingCols[i]);
     m_Cols->setCollapsible(i, false);
     m_Cols->setStretchFactor(i, 1);
-    col->show();
+    m_RoutingCols[i]->show();
 
     switch (static_cast<Col>(i))
     {
@@ -735,6 +747,9 @@ void TcpWidget::LoadConnections(const Router::CONNECTIONS& connections)
 
   Router::sConnection empty;
   AddRow(id++, /*remove*/ false, empty);
+
+  for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
+    m_RoutingCols[i]->ResetCachedSizeHints();
 
   UpdateLayout();
 }
@@ -1346,11 +1361,11 @@ RoutingWidget::RoutingWidget(QWidget* parent /*= nullptr*/)
   m_Cols->show();
   for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
   {
-    RoutingCol* col = new RoutingCol(m_Cols);
-    m_Cols->addWidget(col);
+    m_RoutingCols[i] = new RoutingCol(m_Cols);
+    m_Cols->addWidget(m_RoutingCols[i]);
     m_Cols->setCollapsible(i, false);
     m_Cols->setStretchFactor(i, 1);
-    col->show();
+    m_RoutingCols[i]->show();
 
     switch (static_cast<Col>(i))
     {
@@ -1434,6 +1449,9 @@ void RoutingWidget::LoadRoutes(const Router::ROUTES& routes, const ItemStateTabl
     AddRow(id++, /*remove*/ true, i->label, *i);
 
   AddRow(id++, /*remove*/ false, QString(), Router::sRoute());
+
+  for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
+    m_RoutingCols[i]->ResetCachedSizeHints();
 
   m_Cols->autoSize(nullptr);
 
@@ -2360,10 +2378,10 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
         text +=
             tr("\n\n"
                "Outgoing sACN:\n"
-               "  /sacn=a,b,c,...\n"
-               "  /sacn/offset/<number>=a,b,c,...\n"
-               "  /sacn/priority/<number>=a,b,c,...\n"
-               "  /sacn/perChannelPriority/<number>=a,b,c,...\n"
+               "  /sacn=1,2,3,...\n"
+               "  /sacn/offset/<number>=1,2,3,...\n"
+               "  /sacn/priority/<number>=1,2,3,...\n"
+               "  /sacn/perChannelPriority/<number>=1,2,3,...\n"
                "\n"
                "Ex: sACN to OSC\n"
                "Input:  <sACN universe levels: %1 - %512>\n"
@@ -2381,8 +2399,8 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
         text +=
             tr("\n\n"
                "Outgoing ArtNet:\n"
-               "  /artnet=a,b,c,...\n"
-               "  /artnet/offset/<number>=a,b,c,...\n"
+               "  /artnet=1,2,3,...\n"
+               "  /artnet/offset/<number>=1,2,3,...\n"
                "\n"
                "Ex: ArtNet to OSC\n"
                "Input:  <ArtNet universe levels: %1 - %512>\n"

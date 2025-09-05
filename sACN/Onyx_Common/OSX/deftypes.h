@@ -11,14 +11,16 @@
 #ifndef _DEFTYPES_H_
 #define _DEFTYPES_H_
 
-typedef unsigned int	uint;		//An arbitrary unsigned integer
-typedef signed char		int1;		//A signed integer 1 byte long
-typedef unsigned char	uint1;		//An unsigned integer 1 byte long
-typedef signed short	int2;		//A signed integer 2 bytes long
-typedef unsigned short	uint2;		//An unsigned integer 2 bytes long
-typedef signed long		int4;		//A signed integer 4 bytes long
-typedef unsigned long	uint4;		//An unsigned integer 4 bytes long
-typedef signed long long	int8;	//A signed integer 8 bytes long
-typedef unsigned long long	uint8;	//An unsigned integer 8 bytes long
+#include <stdint.h>
+
+typedef unsigned int uint;  //An arbitrary unsigned integer
+typedef int8_t int1;        //A signed integer 1 byte long
+typedef uint8_t uint1;      //An unsigned integer 1 byte long
+typedef int16_t int2;       //A signed integer 2 bytes long
+typedef uint16_t uint2;     //An unsigned integer 2 bytes long
+typedef int32_t int4;       //A signed integer 4 bytes long
+typedef uint32_t uint4;     //An unsigned integer 4 bytes long
+typedef int64_t	int8;       //A signed integer 8 bytes long
+typedef uint64_t uint8;     //An unsigned integer 8 bytes long
 
 #endif  /*_DEFTYPES_H_*/

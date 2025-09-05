@@ -31,5 +31,7 @@
 	<string>????</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Packet routing</string>
 </dict>
 </plist>

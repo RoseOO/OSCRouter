@@ -1,7 +1,7 @@
 # OSCRouter
 Simple UDP/TCP packet router for Mac and Windows, with optional OSC specific options
 
-⭐ Now with support for PosiStageNet (PSN) and Javascript
+⭐ Now with support for sACN, ArtNet, PosiStageNet (PSN), and Javascript
 
 ![OSCRouter](https://github.com/user-attachments/assets/0a1834a9-b9ea-44f6-a085-4ab8f7aa1a03)
 

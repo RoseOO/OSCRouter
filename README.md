@@ -17,9 +17,7 @@ We also welcome pull requests for bug fixes and feature additions.
 
 # Documentation
 
-[Eos Integration via OSC.pdf](https://github.com/ElectronicTheatreControlsLabs/EosSyncLib/raw/master/Eos%20Integration%20via%20OSC.pdf)
-
-[EosFamily_ShowControl_UserGuide_RevC](http://www.etcconnect.com/workarea/DownloadAsset.aspx?id=10737461372)
+[Eos Manual: OSC](https://www.etcconnect.com/WebDocs/Controls/EosFamilyOnlineHelp/en/Content/23_Show_Control/08_OSC/OPEN_SOUND_CONTROL.htm)
 
 
 # Dependencies

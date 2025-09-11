@@ -312,6 +312,7 @@ ScriptEdit::ScriptEdit(QWidget* parent /*= nullptr*/)
   setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
   setWordWrapMode(QTextOption::NoWrap);
   setLineWrapMode(QTextEdit::NoWrap);
+  setMinimumSize(60, 60);
 
   m_Error = new QPushButton(tr("!"), this);
   int s = m_Error->sizeHint().height();
@@ -323,7 +324,8 @@ ScriptEdit::ScriptEdit(QWidget* parent /*= nullptr*/)
 
 QSize ScriptEdit::sizeHint() const
 {
-  return document()->size().toSize() + QSize(20, 20);
+  QSize sh = document()->size().toSize() + QSize(20, 20);
+  return sh.expandedTo(minimumSize());
 }
 
 void ScriptEdit::CheckForErrors()
@@ -474,8 +476,7 @@ SplitterHandle::SplitterHandle(Qt::Orientation orientation, QSplitter* parent)
 void SplitterHandle::mouseDoubleClickEvent(QMouseEvent* event)
 {
   QSplitterHandle::mouseDoubleClickEvent(event);
-  bool resetAll = event->modifiers().testFlag(Qt::ControlModifier) || event->modifiers().testFlag(Qt::AltModifier) || event->modifiers().testFlag(Qt::ShiftModifier);
-  emit autoSize(resetAll ? nullptr : this);
+  emit autoSize(nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -673,9 +674,8 @@ TcpWidget::TcpWidget(QWidget* parent /*= nullptr*/)
   }
 
   m_Scroll = new QScrollArea(this);
-  m_Scroll->setWidgetResizable(true);
 
-  m_Cols = new Splitter(m_Scroll);
+  m_Cols = new Splitter(m_Scroll->viewport());
   m_Scroll->setWidget(m_Cols);
   m_Cols->show();
   for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
@@ -794,6 +794,9 @@ void TcpWidget::AddRow(size_t id, bool remove, const Router::sConnection& connec
   row.ip = new LineEdit(m_Cols->widget(col));
   row.ip->setToolTip(tr("Server: local network interface for TCP server to run on\n\nClient: IP address of TCP server to connect to"));
   row.ip->setText(connection.addr.ip);
+  int fh = row.ip->sizeHint().height();
+  row.state->setFixedHeight(fh);
+  row.activity->setFixedHeight(fh);
   AddCol(col++, row.ip);
 
   row.port = new LineEdit(m_Cols->widget(col));
@@ -1004,7 +1007,9 @@ void TcpWidget::UpdateLayout()
     maxHeight = qMax(maxHeight, h);
   }
 
-  m_Cols->setGeometry(0, 0, m_Scroll->width(), qMax(height(), maxHeight));
+  const int kMargin = 6;
+  int availableWidth = m_Scroll->width() - style()->pixelMetric(QStyle::PM_ScrollBarExtent) - kMargin;
+  m_Cols->setGeometry(0, 0, qMax(m_Cols->minimumSizeHint().width(), availableWidth), maxHeight + kMargin);
   m_Cols->blockSignals(b);
 
   updateHeaders();
@@ -1344,9 +1349,8 @@ RoutingWidget::RoutingWidget(QWidget* parent /*= nullptr*/)
   m_Headers[static_cast<int>(Col::kOutScript)]->setToolTip(tr("JavaScript"));
 
   m_Scroll = new QScrollArea(this);
-  m_Scroll->setWidgetResizable(true);
 
-  m_Cols = new Splitter(m_Scroll);
+  m_Cols = new Splitter(m_Scroll->viewport());
   m_Scroll->setWidget(m_Cols);
   m_Cols->show();
   for (int i = 0; i < static_cast<int>(Col::kCount); ++i)
@@ -1923,7 +1927,9 @@ void RoutingWidget::UpdateLayout()
     maxHeight = qMax(maxHeight, h);
   }
 
-  m_Cols->setGeometry(0, 0, m_Scroll->width(), qMax(height(), maxHeight));
+  const int kMargin = 6;
+  int availableWidth = m_Scroll->width() - style()->pixelMetric(QStyle::PM_ScrollBarExtent) - kMargin;
+  m_Cols->setGeometry(0, 0, qMax(m_Cols->minimumSizeHint().width(), availableWidth), maxHeight + kMargin);
   m_Cols->blockSignals(b);
 
   updateHeaders();

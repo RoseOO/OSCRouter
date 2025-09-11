@@ -557,16 +557,16 @@ protected:
   virtual void BuildArtNet(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &routesBysACNUniverse, ROUTES_BY_PORT &routesByArtNetUniverse, ArtNet &artnet);
   virtual EosUdpOutThread *CreateUdpOutThread(const EosAddr &addr, ItemStateTable::ID itemStateTableId, UDP_OUT_THREADS &udpOutThreads);
   virtual void AddRoutingDestinations(bool isOSC, const QString &path, const sRoutesByIp &routesByIp, DESTINATIONS_LIST &destinations);
-  virtual void ProcessRecvQ(sACN &sacn, ArtNet &artnet, OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
-                            TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, EosUdpInThread::RECV_Q &recvQ);
-  virtual void ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
-                                 TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket);
+  virtual void ProcessRecvQ(bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList,
+                            UDP_OUT_THREADS &udpOutThreads, TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, EosUdpInThread::RECV_Q &recvQ);
+  virtual void ProcessRecvPacket(bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
+                                 TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket);
   virtual bool MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet);
   virtual bool MakePSNPacket(EosPacket &osc, EosPacket &psn);
   virtual bool SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Protocol protocol, const sRouteDst &routeDst, EosPacket &osc);
   virtual bool SendArtNet(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const EosRouteDst &dst, EosPacket &osc);
   virtual void FlushArtNet(ArtNet &artnet);
-  virtual void ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute);
+  virtual void ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, EosTcpServerThread &tcpServer, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute);
   virtual bool ApplyTransform(OSCArgument &arg, const EosRouteDst &dst, OSCPacketWriter &packet);
   virtual void MakeSendPath(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const QString &dstPath, const OSCArgument *args, size_t argsCount, QString &sendPath);
   virtual void UpdateLog();

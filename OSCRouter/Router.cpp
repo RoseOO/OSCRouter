@@ -818,7 +818,7 @@ void EosTcpClientThread::run()
             for (;;)
             {
               size_t frameSize = 0;
-              char *frame = recvStream.GetNextFrame(frameSize);
+              char *frame = sendStream.GetNextFrame(frameSize);
               if (frame)
               {
                 if (frameSize != 0)
@@ -1627,8 +1627,8 @@ void RouterThread::AddRoutingDestinations(bool isOSC, const QString &path, const
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::ProcessRecvQ(sACN &sacn, ArtNet &artnet, OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
-                                TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, EosUdpInThread::RECV_Q &recvQ)
+void RouterThread::ProcessRecvQ(bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, OSCParser &oscBundleParser, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList,
+                                UDP_OUT_THREADS &udpOutThreads, TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, EosUdpInThread::RECV_Q &recvQ)
 {
   for (EosUdpInThread::RECV_Q::iterator i = recvQ.begin(); i != recvQ.end(); i++)
   {
@@ -1646,21 +1646,21 @@ void RouterThread::ProcessRecvQ(sACN &sacn, ArtNet &artnet, OSCParser &oscBundle
       if (!bundleQ.empty())
       {
         for (EosUdpInThread::RECV_Q::iterator j = bundleQ.begin(); j != bundleQ.end(); j++)
-          ProcessRecvPacket(sacn, artnet, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, addr, Protocol::kOSC, *j);
+          ProcessRecvPacket(muteAllOutgoing, sacn, artnet, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, addr, Protocol::kOSC, *j);
 
         continue;
       }
     }
 
-    ProcessRecvPacket(sacn, artnet, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, addr, Protocol::kInvalid, recvPacket);
+    ProcessRecvPacket(muteAllOutgoing, sacn, artnet, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, addr, Protocol::kInvalid, recvPacket);
   }
   recvQ.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
-                                     TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket)
+void RouterThread::ProcessRecvPacket(bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
+                                     TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket)
 {
   routingDestinationList.clear();
 
@@ -1719,7 +1719,9 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT 
       for (ROUTE_DESTINATIONS::const_iterator j = destinations.begin(); j != destinations.end(); j++)
       {
         const sRouteDst &routeDst = *j;
-        if (IsRouteMuted(routeDst.dstItemStateTableId))
+        SetItemActivity(routeDst.srcItemStateTableId);
+
+        if (muteAllOutgoing || IsRouteMuted(routeDst.dstItemStateTableId))
           continue;
 
         EosAddr dstAddr(routeDst.dst.addr);
@@ -1727,29 +1729,38 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT 
           EosAddr::UIntToIP(recvPacket.ip, dstAddr.ip);
 
         // send UDP or TCP?
-        EosTcpClientThread *tcp = nullptr;
+        bool tcp = false;
+        EosTcpClientThread *tcpClient = nullptr;
         if (routeDst.dst.protocol != Protocol::kPSN && routeDst.dst.protocol != Protocol::ksACN || routeDst.dst.protocol != Protocol::kArtNet)
         {
           TCP_CLIENT_THREADS::const_iterator k = tcpClientThreads.find(dstAddr);
           if (k != tcpClientThreads.end())
-            tcp = k->second;
+          {
+            tcpClient = k->second;
+            tcp = true;
+          }
+          else if (tcpServerThreads.find(dstAddr) != tcpServerThreads.end())
+            tcp = true;
         }
 
         if (tcp)
         {
-          if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet)
+          if (tcpClient)
           {
-            EosPacket packet;
-            if (MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, packet) && tcp->SendFramed(packet))
+            if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet)
             {
-              SetItemActivity(routeDst.srcItemStateTableId);
-              SetItemActivity(tcp->GetItemStateTableId());
+              EosPacket packet;
+              if (MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, packet) && tcpClient->SendFramed(packet))
+              {
+                SetItemActivity(routeDst.dstItemStateTableId);
+                SetItemActivity(tcpClient->GetItemStateTableId());
+              }
             }
-          }
-          else if (tcp->Send(recvPacket.packet))
-          {
-            SetItemActivity(routeDst.srcItemStateTableId);
-            SetItemActivity(tcp->GetItemStateTableId());
+            else if (tcpClient->Send(recvPacket.packet))
+            {
+              SetItemActivity(routeDst.dstItemStateTableId);
+              SetItemActivity(tcpClient->GetItemStateTableId());
+            }
           }
         }
         else if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet)
@@ -1764,46 +1775,31 @@ void RouterThread::ProcessRecvPacket(sACN &sacn, ArtNet &artnet, ROUTES_BY_PORT 
             {
               EosUdpOutThread *thread = CreateUdpOutThread(dstAddr, routeDst.dstItemStateTableId, udpOutThreads);
               if (thread && thread->Send(psnPacket))
-              {
-                SetItemActivity(routeDst.srcItemStateTableId);
                 SetItemActivity(routeDst.dstItemStateTableId);
-              }
             }
           }
           else if (routeDst.dst.protocol == Protocol::ksACN)
           {
             if (SendsACN(sacn, artnet, addr, protocol, routeDst, oscPacket))
-            {
-              SetItemActivity(routeDst.srcItemStateTableId);
               SetItemActivity(routeDst.dstItemStateTableId);
-            }
           }
           else if (routeDst.dst.protocol == Protocol::kArtNet)
           {
             if (SendArtNet(artnet, addr, protocol, routeDst.dst, oscPacket))
-            {
-              SetItemActivity(routeDst.srcItemStateTableId);
               SetItemActivity(routeDst.dstItemStateTableId);
-            }
           }
           else if (oscPacket.GetDataConst() && oscPacket.GetSize() > 0)
           {
             EosUdpOutThread *thread = CreateUdpOutThread(dstAddr, routeDst.dstItemStateTableId, udpOutThreads);
             if (thread && thread->Send(oscPacket))
-            {
-              SetItemActivity(routeDst.srcItemStateTableId);
               SetItemActivity(routeDst.dstItemStateTableId);
-            }
           }
         }
         else
         {
           EosUdpOutThread *thread = CreateUdpOutThread(dstAddr, routeDst.dstItemStateTableId, udpOutThreads);
           if (thread && thread->Send(recvPacket.packet))
-          {
-            SetItemActivity(routeDst.srcItemStateTableId);
             SetItemActivity(routeDst.dstItemStateTableId);
-          }
         }
       }
     }
@@ -2456,7 +2452,7 @@ bool RouterThread::SendArtNet(ArtNet &artnet, const EosAddr &addr, Protocol prot
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, OSCStream::EnumFrameMode frameMode, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute)
+void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, EosTcpServerThread &tcpServer, EosTcpServerThread::CONNECTION_Q &tcpConnectionQ, bool mute)
 {
   for (EosTcpServerThread::CONNECTION_Q::const_iterator i = tcpConnectionQ.begin(); i != tcpConnectionQ.end(); i++)
   {
@@ -2473,7 +2469,7 @@ void RouterThread::ProcessTcpConnectionQ(TCP_CLIENT_THREADS &tcpClientThreads, O
 
     EosTcpClientThread *thread = new EosTcpClientThread();
     tcpClientThreads[tcpConnection.addr] = thread;
-    thread->Start(tcpConnection.tcp, tcpConnection.addr, ItemStateTable::sm_Invalid_Id, frameMode, m_ReconnectDelay, mute);
+    thread->Start(tcpConnection.tcp, tcpConnection.addr, tcpServer.GetItemStateTableId(), tcpServer.GetFrameMode(), /*reconnectDelayMS*/ 0, mute);
   }
 }
 
@@ -2813,7 +2809,7 @@ void RouterThread::run()
     // sACN input
     RecvsACN(sacn, dmxRecvQ);
 
-    if (!muteAll.incoming && !muteAll.outgoing)
+    if (!muteAll.incoming)
     {
       EosAddr dmxAddr;
       for (size_t i = 0; i < dmxRecvQ.size(); ++i)
@@ -2821,14 +2817,14 @@ void RouterThread::run()
         EosUdpInThread::sRecvPortPacket &dmxPacket = dmxRecvQ[i];
         dmxAddr.fromUInt(dmxPacket.p.ip);
         dmxAddr.port = dmxPacket.port;
-        ProcessRecvPacket(sacn, artnet, routesBysACNUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, dmxAddr, Protocol::ksACN, dmxPacket.p);
+        ProcessRecvPacket(muteAll.outgoing, sacn, artnet, routesBysACNUniverse, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, dmxAddr, Protocol::ksACN, dmxPacket.p);
       }
     }
 
     // ArtNet input
     RecvArtNet(artnet, dmxRecvQ);
 
-    if (!muteAll.incoming && !muteAll.outgoing)
+    if (!muteAll.incoming)
     {
       EosAddr dmxAddr;
       for (size_t i = 0; i < dmxRecvQ.size(); ++i)
@@ -2836,7 +2832,7 @@ void RouterThread::run()
         EosUdpInThread::sRecvPortPacket &dmxPacket = dmxRecvQ[i];
         dmxAddr.fromUInt(dmxPacket.p.ip);
         dmxAddr.port = dmxPacket.port;
-        ProcessRecvPacket(sacn, artnet, routesByArtNetUniverse, routingDestinationList, udpOutThreads, tcpClientThreads, dmxAddr, Protocol::kArtNet, dmxPacket.p);
+        ProcessRecvPacket(muteAll.outgoing, sacn, artnet, routesByArtNetUniverse, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, dmxAddr, Protocol::kArtNet, dmxPacket.p);
       }
     }
 
@@ -2851,9 +2847,7 @@ void RouterThread::run()
       tempLogQ.clear();
 
       SetItemState(thread->GetItemStateTableId(), thread->GetState());
-
-      if (!muteAll.outgoing)
-        ProcessRecvQ(sacn, artnet, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
+      ProcessRecvQ(muteAll.outgoing, sacn, artnet, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, thread->GetAddr(), recvQ);
 
       if (!running)
       {
@@ -2878,7 +2872,7 @@ void RouterThread::run()
       if (!tcpConnectionQ.empty())
       {
         SetItemActivity(thread->GetItemStateTableId());
-        ProcessTcpConnectionQ(tcpClientThreads, thread->GetFrameMode(), tcpConnectionQ, muteAll.incoming);
+        ProcessTcpConnectionQ(tcpClientThreads, *thread, tcpConnectionQ, muteAll.incoming);
       }
 
       if (!running)
@@ -2901,9 +2895,7 @@ void RouterThread::run()
       tempLogQ.clear();
 
       SetItemState(thread->GetItemStateTableId(), thread->GetState());
-
-      if (!muteAll.outgoing)
-        ProcessRecvQ(sacn, artnet, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpClientThreads, thread->GetAddr(), recvQ);
+      ProcessRecvQ(muteAll.outgoing, sacn, artnet, oscBundleParser, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, thread->GetAddr(), recvQ);
 
       if (!running)
       {

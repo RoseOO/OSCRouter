@@ -409,12 +409,12 @@ const QIcon& RoutingCheckBox::GetIcon(Style checkBoxStyle, bool checked)
     {
       if (checked)
       {
-        static QIcon iconChecked(QLatin1String(":/qt/etc/NetworkOff.svg"));
+        static QIcon iconChecked(QLatin1String(":/qt/etc/images/NetworkOff.svg"));
         return iconChecked;
       }
       else
       {
-        static QIcon iconUnchecked(QLatin1String(":/qt/etc/NetworkOn.svg"));
+        static QIcon iconUnchecked(QLatin1String(":/qt/etc/images/NetworkOn.svg"));
         return iconUnchecked;
       }
     }
@@ -422,11 +422,11 @@ const QIcon& RoutingCheckBox::GetIcon(Style checkBoxStyle, bool checked)
 
   if (checked)
   {
-    static QIcon iconChecked(QLatin1String(":/qt/etc/CheckBoxOn.svg"));
+    static QIcon iconChecked(QLatin1String(":/qt/etc/images/CheckBoxOn.svg"));
     return iconChecked;
   }
 
-  static QIcon iconUnchecked(QLatin1String(":/qt/etc/CheckBoxOff.svg"));
+  static QIcon iconUnchecked(QLatin1String(":/qt/etc/images/CheckBoxOff.svg"));
   return iconUnchecked;
 }
 
@@ -3083,7 +3083,7 @@ void MainWindow::onAboutHelp()
 
     QLabel* icon = new QLabel(this);
     grid->addWidget(icon, row, 0, Qt::AlignCenter);
-    icon->setPixmap(QPixmap(QStringLiteral(":/qt/etc/Icon.png")).scaledToWidth(200, Qt::SmoothTransformation));
+    icon->setPixmap(QPixmap(QStringLiteral(":/qt/etc/images/Icon.png")).scaledToWidth(200, Qt::SmoothTransformation));
     ++row;
 
     grid->addWidget(new QLabel(QLatin1String(VER_PRODUCTNAME_STR) + QLatin1Char(' ') + QLatin1String(VER_PRODUCTVERSION_STR), this), row, 0, Qt::AlignCenter);

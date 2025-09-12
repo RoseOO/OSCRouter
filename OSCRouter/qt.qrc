@@ -1,10 +1,10 @@
 <RCC>
 <qresource prefix="/qt/etc">    
   <file>qt.conf</file>
-  <file>Icon.png</file>
-  <file>NetworkOn.svg</file>
-  <file>NetworkOff.svg</file>
-  <file>CheckBoxOn.svg</file>
-  <file>CheckBoxOff.svg</file>
+  <file>images/Icon.png</file>
+  <file>images/NetworkOn.svg</file>
+  <file>images/NetworkOff.svg</file>
+  <file>images/CheckBoxOn.svg</file>
+  <file>images/CheckBoxOff.svg</file>
 </qresource>
 </RCC>

@@ -2599,10 +2599,12 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
 
   m_StartButton = new QPushButton(tr("Start"), routingBase);
   QFont fnt = m_StartButton->font();
-  fnt.setPointSize(11);
+  fnt.setPointSize(fnt.pointSize() + 2);
   m_StartButton->setFont(fnt);
   QPalette pal = m_StartButton->palette();
-  pal.setColor(QPalette::Active, QPalette::Button, QColor(8, 91, 44));
+  QColor buttonColor = QColor(8, 91, 44);
+  pal.setColor(QPalette::Active, QPalette::Button, buttonColor);
+  pal.setColor(QPalette::Inactive, QPalette::Button, buttonColor);
   pal.setColor(QPalette::Active, QPalette::ButtonText, Qt::white);
   m_StartButton->setPalette(pal);
   connect(m_StartButton, &QPushButton::clicked, this, &MainWindow::onStartClicked);
@@ -2610,7 +2612,9 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
 
   m_StopButton = new QPushButton(tr("Stop"), routingBase);
   m_StopButton->setFont(fnt);
-  pal.setColor(QPalette::Active, QPalette::Button, QColor(89, 18, 30));
+  buttonColor = QColor(89, 18, 30);
+  pal.setColor(QPalette::Active, QPalette::Button, buttonColor);
+  pal.setColor(QPalette::Inactive, QPalette::Button, buttonColor);
   m_StopButton->setPalette(pal);
   m_StopButton->setEnabled(false);
   connect(m_StopButton, &QPushButton::clicked, this, &MainWindow::onStopClicked);
@@ -2844,6 +2848,8 @@ bool MainWindow::Load(const QString& path)
   contents.remove(QLatin1Char('\r'));
   QStringList lines = contents.split(QLatin1Char('\n'));
 
+  Shutdown();
+
   m_RoutingWidget->Load(lines);
   m_TcpWidget->Load(lines);
   m_SettingsWidget->Load(lines);
@@ -2940,6 +2946,8 @@ void MainWindow::onNewFile()
 {
   if (!ResolveUnsaved())
     return;
+
+  Shutdown();
 
   m_RoutingWidget->LoadRoutes(Router::ROUTES(), ItemStateTable());
   m_TcpWidget->LoadConnections(Router::CONNECTIONS());

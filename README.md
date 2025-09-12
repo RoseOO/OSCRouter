@@ -1,4 +1,3 @@
-[example_1.0.1.osc.txt](https://github.com/user-attachments/files/22303313/example_1.0.1.osc.txt)[example.osc.txt](https://github.com/user-attachments/files/22303305/example.osc.txt)# OSCRouter
 Simple UDP/TCP packet router for Mac and Windows, with optional OSC specific options
 
 ⭐ Now with support for sACN, ArtNet, PosiStageNet (PSN), and Javascript
@@ -7,7 +6,7 @@ Simple UDP/TCP packet router for Mac and Windows, with optional OSC specific opt
 
 ## Example File (pictured above)
 
-[example.osc.txt](https://github.com/user-attachments/files/22178522/example.osc.txt)
+[example.osc.txt](https://github.com/user-attachments/files/22303333/example.osc.txt)
 
 
 ## About this ETCLabs Project

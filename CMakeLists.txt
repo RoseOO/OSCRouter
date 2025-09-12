@@ -122,6 +122,7 @@ if(WIN32)
   )
 elseif(APPLE)
   include_directories(
+    "OSCRouter/Mac"
     "sACN/ACN/StreamingACN/Client/OSX"
     "sACN/ACN/StreamingACN/Server/OSX"
     "sACN/Network_Common/AsyncSocket/OSX"
@@ -132,6 +133,7 @@ elseif(APPLE)
   )
 
   file(GLOB MAC_HEADERS
+    "OSCRouter/Mac/*.h"
     "sACN/ACN/StreamingACN/Client/OSX/*.h"
     "sACN/ACN/StreamingACN/Server/OSX/*.h"
     "sACN/Network_Common/AsyncSocket/OSX/*.h"
@@ -142,14 +144,18 @@ elseif(APPLE)
   set(HEADERS ${HEADERS} ${MAC_HEADERS})
 
   file(GLOB MAC_SOURCES
+    "OSCRouter/Mac/*.cpp"
+    "OSCRouter/Mac/*.mm"
     "sACN/ACN/StreamingACN/Client/OSX/*.cpp"
     "sACN/ACN/StreamingACN/Server/OSX/*.cpp"
-    "sACN/Network_Common/AsyncSocket/OSX/*.cpp"
     "sACN/Network_Common/ObjectSync/OSX/*.cpp"
     "sACN/Network_Common/Tock/OSX/*.cpp"
   )
 
-  set(SOURCES ${SOURCES} ${MAC_SOURCES})
+  set(SOURCES ${SOURCES} ${MAC_SOURCES}
+    "sACN/Network_Common/AsyncSocket/OSX/AsyncSocketServ_select.cpp"
+    "sACN/Network_Common/AsyncSocket/OSX/IfaceSupport.cpp"
+  )
 
   set(EOS_SYNC_LIBS_SOURCES ${EOS_SYNC_LIBS_SOURCES}
     "../EosSyncLib/EosSyncLib/EosTcp_Mac.cpp"
@@ -165,6 +171,8 @@ elseif(APPLE)
   )
   set_source_files_properties(${BUNDLE_RESOURCE_FILES} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   source_group("Resources" FILES ${BUNDLE_RESOURCE_FILES})
+
+  add_compile_definitions(HAVE_SOCKADDR_SA_LEN)
 endif()
 
 add_compile_definitions(NOMINMAX)

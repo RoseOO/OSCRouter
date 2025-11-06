@@ -295,6 +295,55 @@ void LogWidget::wheelEvent(QWheelEvent *event)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+void LogWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+  QMenu menu(this);
+  QAction *clearAction = menu.addAction("Clear Log");
+  QAction *topAction = menu.addAction("Scroll to Top");
+  QAction *bottomAction = menu.addAction("Scroll to Bottom");
+
+  if (!m_VScrollBar->isEnabled() || m_VScrollBar->value() == m_VScrollBar->minimum())
+    topAction->setEnabled(false);
+
+  if (!m_VScrollBar->isEnabled() || m_VScrollBar->value() == m_VScrollBar->maximum())
+    bottomAction->setEnabled(false);
+
+  QAction *chosen = menu.exec(event->globalPos());
+  if (!chosen)
+    return;
+
+  if (chosen == clearAction)
+  {
+    Clear();
+  }
+  else if (chosen == topAction)
+  {
+    ScrollToTop();
+  }
+  else if (chosen == bottomAction)
+  {
+    ScrollToBottom();
+  }
+}
+
+void LogWidget::ScrollToTop()
+{
+  m_AutoScroll = false;
+  if (m_VScrollBar->isEnabled())
+    m_VScrollBar->setValue(m_VScrollBar->minimum());
+  update();
+}
+
+void LogWidget::ScrollToBottom()
+{
+  m_AutoScroll = true;
+  if (m_VScrollBar->isEnabled())
+    m_VScrollBar->setValue(m_VScrollBar->maximum());
+  update();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 void LogWidget::onVScrollChanged(int /*value*/)
 {
   update();

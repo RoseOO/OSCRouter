@@ -46,8 +46,12 @@ public:
 private slots:
   void onVScrollChanged(int value);
   void onHScrollChanged(int value);
+  void ScrollToTop();
+  void ScrollToBottom();
 
 protected:
+  void contextMenuEvent(QContextMenuEvent *event) override;
+
   struct sLine
   {
     QString text;

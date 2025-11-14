@@ -352,6 +352,7 @@ private slots:
 
 private:
   QSettings& m_Settings;
+  QScrollArea* m_Scroll = nullptr;
   QComboBox* m_sACNInterface = nullptr;
   QComboBox* m_ArtNetInterface = nullptr;
   QCheckBox* m_LevelChangesOnly = nullptr;

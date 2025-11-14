@@ -1092,36 +1092,43 @@ SettingsWidget::SettingsWidget(QSettings& settings, QWidget* parent /*= nullptr*
 {
   setAutoFillBackground(true);
 
-  QGridLayout* grid = new QGridLayout(this);
+  QGridLayout* settingsLayout = new QGridLayout(this);
+  settingsLayout->setContentsMargins(0, 0, 0, 0);
+  m_Scroll = new QScrollArea(this);
+  settingsLayout->addWidget(m_Scroll);
+
+  QWidget* base = new QWidget(m_Scroll->viewport());
+  m_Scroll->setWidget(base);
+  m_Scroll->setWidgetResizable(true);
+
+  QGridLayout* grid = new QGridLayout(base);
   grid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
   int row = 0;
-
-  grid->addWidget(new QLabel(tr("Auto Start"), this), row, 0);
-  QCheckBox* checkbox = new QCheckBox(this);
+  grid->addWidget(new QLabel(tr("Auto Start"), base), row, 0);
+  QCheckBox* checkbox = new QCheckBox(base);
   checkbox->setChecked(m_Settings.value(SETTING_AUTO_START).toBool());
   connect(checkbox, &QCheckBox::toggled, this, &SettingsWidget::onAutoStartToggled);
   grid->addWidget(checkbox, row, 1);
   ++row;
 
-  grid->addWidget(new QLabel(tr("sACN Interface"), this), row, 0);
-  m_sACNInterface = new QComboBox(this);
+  grid->addWidget(new QLabel(tr("sACN Interface"), base), row, 0);
+  m_sACNInterface = new QComboBox(base);
   connect(m_sACNInterface, &QComboBox::currentIndexChanged, this, &SettingsWidget::onCurrentIndexChanged);
   grid->addWidget(m_sACNInterface, row, 1);
   ++row;
 
-  grid->addWidget(new QLabel(tr("Artnet Interface"), this), row, 0);
-  m_ArtNetInterface = new QComboBox(this);
+  grid->addWidget(new QLabel(tr("Artnet Interface"), base), row, 0);
+  m_ArtNetInterface = new QComboBox(base);
   connect(m_ArtNetInterface, &QComboBox::currentIndexChanged, this, &SettingsWidget::onCurrentIndexChanged);
   grid->addWidget(m_ArtNetInterface, row, 1);
   ++row;
 
-  QLabel* label = new QLabel(tr("sACN & Artnet: Level Changes Only"), this);
+  QLabel* label = new QLabel(tr("sACN & Artnet: Level Changes Only"), base);
   label->setToolTip(tr("Only act upon incoming sACN & ArtNet when a level in the universe changes"));
   grid->addWidget(label, row, 0);
-  m_LevelChangesOnly = new QCheckBox(this);
+  m_LevelChangesOnly = new QCheckBox(base);
   m_LevelChangesOnly->setToolTip(label->toolTip());
   grid->addWidget(m_LevelChangesOnly, row, 1);
-  ++row;
 
   Clear();
 }

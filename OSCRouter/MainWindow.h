@@ -352,10 +352,10 @@ protected:
 private slots:
   void onAutoStartToggled(bool checked);
   void onCurrentIndexChanged(int index);
-  void refreshMidiDevices();
+  void refreshMIDIDevices();
 
 private:
-  enum class MidiProp
+  enum class MIDIProp
   {
     kType = 0,
     kName,
@@ -364,26 +364,26 @@ private:
     kCount
   };
 
-  struct MidiDevice
+  struct MIDIDevice
   {
-    std::array<QString, static_cast<size_t>(MidiProp::kCount)> props;
+    std::array<QString, static_cast<size_t>(MIDIProp::kCount)> props;
   };
 
-  typedef std::vector<MidiDevice> MidiDeviceList;
+  typedef std::vector<MIDIDevice> MIDIDeviceList;
 
   QSettings& m_Settings;
   QScrollArea* m_Scroll = nullptr;
   QComboBox* m_sACNInterface = nullptr;
   QComboBox* m_ArtNetInterface = nullptr;
   QCheckBox* m_LevelChangesOnly = nullptr;
-  QTableWidget* m_Midi = nullptr;
+  QTableWidget* m_MIDI = nullptr;
 
   void LoadLine(const QString& line, Router::Settings& settings);
 
   static void PopulateInterfaces(QComboBox* combo, const QString& defaultText);
   static QString GetInterface(QComboBox* combo);
   static void SetInterface(QComboBox* combo, const QString& ip);
-  static QString MidiPropName(MidiProp prop);
+  static QString MIDIPropName(MIDIProp prop);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -398,6 +398,7 @@ public:
   Protocol GetProtocol() const;
 
   static QString ProtocolName(Protocol protocol);
+  static bool ValidPort(Protocol protocol, unsigned short port);
   static Protocol SanitizedProtocol(int protocol);
 
 signals:

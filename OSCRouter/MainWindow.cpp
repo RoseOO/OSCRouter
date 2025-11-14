@@ -1145,15 +1145,15 @@ SettingsWidget::SettingsWidget(QSettings& settings, QWidget* parent /*= nullptr*
   button->setToolTip(tr("Refresh MIDI Devices"));
   int buttonSize = button->sizeHint().height();
   button->setFixedSize(buttonSize, buttonSize);
-  connect(button, &QPushButton::clicked, this, &SettingsWidget::refreshMidiDevices);
+  connect(button, &QPushButton::clicked, this, &SettingsWidget::refreshMIDIDevices);
   cellLayout->addWidget(button);
 
-  m_Midi = new QTableWidget(0, static_cast<int>(MidiProp::kCount), base);
-  for (int col = 0; col < m_Midi->columnCount(); ++col)
-    m_Midi->setHorizontalHeaderItem(col, new QTableWidgetItem(MidiPropName(static_cast<MidiProp>(col))));
-  m_Midi->verticalHeader()->hide();
-  m_Midi->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-  grid->addWidget(m_Midi, row, 1);
+  m_MIDI = new QTableWidget(0, static_cast<int>(MIDIProp::kCount), base);
+  for (int col = 0; col < m_MIDI->columnCount(); ++col)
+    m_MIDI->setHorizontalHeaderItem(col, new QTableWidgetItem(MIDIPropName(static_cast<MIDIProp>(col))));
+  m_MIDI->verticalHeader()->hide();
+  m_MIDI->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+  grid->addWidget(m_MIDI, row, 1);
 
   Clear();
 }
@@ -1280,13 +1280,13 @@ void SettingsWidget::SetInterface(QComboBox* combo, const QString& ip)
   }
 }
 
-QString SettingsWidget::MidiPropName(MidiProp prop)
+QString SettingsWidget::MIDIPropName(MIDIProp prop)
 {
   switch (prop)
   {
-    case MidiProp::kType: return tr("Type");
-    case MidiProp::kName: return tr("Name");
-    case MidiProp::kPort: return tr("Port");
+    case MIDIProp::kType: return tr("Type");
+    case MIDIProp::kName: return tr("Name");
+    case MIDIProp::kPort: return tr("Port");
     default: break;
   }
 
@@ -1295,7 +1295,7 @@ QString SettingsWidget::MidiPropName(MidiProp prop)
 
 void SettingsWidget::showEvent(QShowEvent* event)
 {
-  refreshMidiDevices();
+  refreshMIDIDevices();
 }
 
 void SettingsWidget::onAutoStartToggled(bool checked)
@@ -1322,12 +1322,12 @@ void SettingsWidget::onCurrentIndexChanged(int index)
   combo->setPalette(pal);
 }
 
-void SettingsWidget::refreshMidiDevices()
+void SettingsWidget::refreshMIDIDevices()
 {
   std::vector<RtMidi::Api> apis;
   RtMidi::getCompiledApi(apis);
 
-  MidiDeviceList devices;
+  MIDIDeviceList devices;
 
   for (const RtMidi::Api& api : apis)
   {
@@ -1338,10 +1338,10 @@ void SettingsWidget::refreshMidiDevices()
       unsigned int portCount = midiIn->getPortCount();
       for (unsigned int port = 0; port < portCount; ++port)
       {
-        MidiDevice device;
-        device.props[static_cast<size_t>(MidiProp::kName)] = QString::fromStdString(midiIn->getPortName(port));
-        device.props[static_cast<size_t>(MidiProp::kPort)] = QString::number(port);
-        device.props[static_cast<size_t>(MidiProp::kType)] = tr("Input");
+        MIDIDevice device;
+        device.props[static_cast<size_t>(MIDIProp::kName)] = QString::fromStdString(midiIn->getPortName(port));
+        device.props[static_cast<size_t>(MIDIProp::kPort)] = QString::number(port);
+        device.props[static_cast<size_t>(MIDIProp::kType)] = tr("Input");
         devices.push_back(device);
       }
     }
@@ -1354,27 +1354,27 @@ void SettingsWidget::refreshMidiDevices()
       for (unsigned int port = 0; port < portCount; ++port)
       {
         midiOut->getPortName(port);
-        MidiDevice device;
-        device.props[static_cast<size_t>(MidiProp::kName)] = QString::fromStdString(midiOut->getPortName(port));
-        device.props[static_cast<size_t>(MidiProp::kPort)] = QString::number(port);
-        device.props[static_cast<size_t>(MidiProp::kType)] = tr("Output");
+        MIDIDevice device;
+        device.props[static_cast<size_t>(MIDIProp::kName)] = QString::fromStdString(midiOut->getPortName(port));
+        device.props[static_cast<size_t>(MIDIProp::kPort)] = QString::number(port);
+        device.props[static_cast<size_t>(MIDIProp::kType)] = tr("Output");
         devices.push_back(device);
       }
     }
   }
 
-  m_Midi->setRowCount(static_cast<int>(devices.size()));
+  m_MIDI->setRowCount(static_cast<int>(devices.size()));
   for (int row = 0; row < static_cast<int>(devices.size()); ++row)
   {
-    const MidiDevice& device = devices[static_cast<size_t>(row)];
-    for (int col = 0; col < static_cast<int>(MidiProp::kCount); ++col)
+    const MIDIDevice& device = devices[static_cast<size_t>(row)];
+    for (int col = 0; col < static_cast<int>(MIDIProp::kCount); ++col)
     {
-      QTableWidgetItem* item = m_Midi->item(row, col);
+      QTableWidgetItem* item = m_MIDI->item(row, col);
       if (!item)
       {
         item = new QTableWidgetItem();
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
-        m_Midi->setItem(row, col, item);
+        m_MIDI->setItem(row, col, item);
       }
 
       item->setText(device.props[static_cast<size_t>(col)]);
@@ -1394,6 +1394,7 @@ ProtocolComboBox::ProtocolComboBox(size_t row, Protocol protocol, QWidget* paren
   addItem(ProtocolName(Protocol::ksACN), static_cast<int>(Protocol::ksACN));
   addItem(ProtocolName(Protocol::kArtNet), static_cast<int>(Protocol::kArtNet));
   addItem(ProtocolName(Protocol::kPSN), static_cast<int>(Protocol::kPSN));
+  addItem(ProtocolName(Protocol::kMIDI), static_cast<int>(Protocol::kMIDI));
 
   int index = findData(static_cast<int>(SanitizedProtocol(static_cast<int>(protocol))));
   if (index >= 0)
@@ -1420,9 +1421,21 @@ QString ProtocolComboBox::ProtocolName(Protocol protocol)
     case Protocol::kPSN: return tr("PSN");
     case Protocol::ksACN: return tr("sACN");
     case Protocol::kArtNet: return tr("ArtNet");
+    case Protocol::kMIDI: return tr("MIDI");
   }
 
   return tr("Unknown(%1)").arg(static_cast<int>(protocol));
+}
+
+bool ProtocolComboBox::ValidPort(Protocol protocol, unsigned short port)
+{
+  switch (protocol)
+  {
+    case Protocol::kArtNet:
+    case Protocol::kMIDI: return true;
+  }
+
+  return (port != 0);
 }
 
 Protocol ProtocolComboBox::SanitizedProtocol(int protocol)
@@ -1659,7 +1672,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.inIP);
 
   row.inPort = new LineEdit(m_Cols->widget(col));
-  row.inPort->setText((route.src.addr.port == 0 && route.src.protocol != Protocol::kArtNet) ? QString() : QString::number(route.src.addr.port));
+  row.inPort->setText(ProtocolComboBox::ValidPort(route.src.protocol, route.src.addr.port) ? QString::number(route.src.addr.port) : QString());
   AddCol(col++, row.inPort);
 
   row.inProtocol = new ProtocolComboBox(id, route.src.protocol, m_Cols->widget(col));
@@ -1717,7 +1730,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.outIP);
 
   row.outPort = new LineEdit(m_Cols->widget(col));
-  row.outPort->setText((route.dst.addr.port == 0 && route.dst.protocol != Protocol::kArtNet) ? QString() : QString::number(route.dst.addr.port));
+  row.outPort->setText(ProtocolComboBox::ValidPort(route.dst.protocol, route.dst.addr.port) ? QString::number(route.dst.addr.port) : QString());
   AddCol(col++, row.outPort);
 
   row.outProtocol = new ProtocolComboBox(id, route.dst.protocol, m_Cols->widget(col));
@@ -1935,7 +1948,7 @@ void RoutingWidget::SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemState
     route.src.protocol = row.inProtocol->GetProtocol();
 
     route.src.addr.port = row.inPort->text().toUShort();
-    if (route.src.addr.port == 0 && route.src.protocol != Protocol::kArtNet)
+    if (!ProtocolComboBox::ValidPort(route.src.protocol, route.src.addr.port))
       continue;  // port required
 
     route.enable = row.enable->isChecked();
@@ -2386,6 +2399,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
       {
         case Protocol::ksACN: text = tr("Route sACN levels received on this sACN universe (REQUIRED)"); break;
         case Protocol::kArtNet: text = tr("Route ArtNet levels received on this ArtNet universe (REQUIRED)"); break;
+        case Protocol::kMIDI: text = tr("See available MIDI ports in Settings tab"); break;
         default: text = tr("Route packets received on this port (REQUIRED)"); break;
       }
     }
@@ -2473,6 +2487,12 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
               tr("Route recevied packets to this outgoing ArtNet universe\n"
                  "\n"
                  "Leave blank to route packets to the same universe/port they were received on");
+        }
+        break;
+
+        case Protocol::kMIDI:
+        {
+          text = tr("See available MIDI ports in Settings tab");
         }
         break;
 

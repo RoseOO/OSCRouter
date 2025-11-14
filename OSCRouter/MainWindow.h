@@ -367,6 +367,7 @@ private:
   struct MIDIDevice
   {
     std::array<QString, static_cast<size_t>(MIDIProp::kCount)> props;
+    QColor color;
   };
 
   typedef std::vector<MIDIDevice> MIDIDeviceList;
@@ -398,7 +399,6 @@ public:
   Protocol GetProtocol() const;
 
   static QString ProtocolName(Protocol protocol);
-  static bool ValidPort(Protocol protocol, unsigned short port);
   static Protocol SanitizedProtocol(int protocol);
 
 signals:

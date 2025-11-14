@@ -84,11 +84,14 @@ enum class Protocol
   kPSN,
   ksACN,
   kArtNet,
+  kMIDI,
 
   kCount,
   kDefault = kOSC,
   kInvalid = 0xffff
 };
+
+bool ValidPort(Protocol protocol, unsigned short port);
 
 ////////////////////////////////////////////////////////////////////////////////
 

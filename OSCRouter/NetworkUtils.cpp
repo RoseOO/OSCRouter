@@ -156,6 +156,19 @@ void EosAddr::UIntToIP(unsigned int n, QString &ip)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+bool ValidPort(Protocol protocol, unsigned short port)
+{
+  switch (protocol)
+  {
+    case Protocol::kArtNet:
+    case Protocol::kMIDI: return true;
+  }
+
+  return (port != 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 EosRouteSrc::EosRouteSrc(const EosAddr &Addr, Protocol Protocol, const QString &Path)
   : addr(Addr)
   , protocol(Protocol)

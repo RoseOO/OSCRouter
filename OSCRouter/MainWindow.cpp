@@ -23,7 +23,6 @@
 #include "EosPlatform.h"
 #include "LogWidget.h"
 #include "Version.h"
-#include "RtMidi.h"
 #include <time.h>
 
 #ifdef WIN32
@@ -1293,7 +1292,7 @@ QString SettingsWidget::MIDIPropName(MIDIProp prop)
   return QString();
 }
 
-void SettingsWidget::showEvent(QShowEvent* event)
+void SettingsWidget::showEvent(QShowEvent* /*event*/)
 {
   refreshMIDIDevices();
 }
@@ -1324,43 +1323,51 @@ void SettingsWidget::onCurrentIndexChanged(int index)
 
 void SettingsWidget::refreshMIDIDevices()
 {
-  std::vector<RtMidi::Api> apis;
-  RtMidi::getCompiledApi(apis);
-
   MIDIDeviceList devices;
 
-  for (const RtMidi::Api& api : apis)
+  try
   {
-    // midi in
-    {
-      std::unique_ptr<RtMidiIn> midiIn = std::make_unique<RtMidiIn>(api);
+    std::vector<RtMidi::Api> apis;
+    RtMidi::getCompiledApi(apis);
 
-      unsigned int portCount = midiIn->getPortCount();
-      for (unsigned int port = 0; port < portCount; ++port)
+    for (const RtMidi::Api& api : apis)
+    {
+      // midi in
       {
-        MIDIDevice device;
-        device.props[static_cast<size_t>(MIDIProp::kName)] = QString::fromStdString(midiIn->getPortName(port));
-        device.props[static_cast<size_t>(MIDIProp::kPort)] = QString::number(port);
-        device.props[static_cast<size_t>(MIDIProp::kType)] = tr("Input");
-        devices.push_back(device);
+        std::unique_ptr<RtMidiIn> midiIn = std::make_unique<RtMidiIn>(api);
+
+        unsigned int portCount = midiIn->getPortCount();
+        for (unsigned int port = 0; port < portCount; ++port)
+        {
+          MIDIDevice device;
+          device.props[static_cast<size_t>(MIDIProp::kName)] = QString::fromStdString(midiIn->getPortName(port));
+          device.props[static_cast<size_t>(MIDIProp::kPort)] = QString::number(port);
+          device.props[static_cast<size_t>(MIDIProp::kType)] = tr("Input");
+          device.color = RECV_COLOR;
+          devices.push_back(device);
+        }
+      }
+
+      // midi out
+      {
+        std::unique_ptr<RtMidiOut> midiOut = std::make_unique<RtMidiOut>(api);
+
+        unsigned int portCount = midiOut->getPortCount();
+        for (unsigned int port = 0; port < portCount; ++port)
+        {
+          midiOut->getPortName(port);
+          MIDIDevice device;
+          device.props[static_cast<size_t>(MIDIProp::kName)] = QString::fromStdString(midiOut->getPortName(port));
+          device.props[static_cast<size_t>(MIDIProp::kPort)] = QString::number(port);
+          device.props[static_cast<size_t>(MIDIProp::kType)] = tr("Output");
+          device.color = SEND_COLOR;
+          devices.push_back(device);
+        }
       }
     }
-
-    // midi out
-    {
-      std::unique_ptr<RtMidiOut> midiOut = std::make_unique<RtMidiOut>(api);
-
-      unsigned int portCount = midiOut->getPortCount();
-      for (unsigned int port = 0; port < portCount; ++port)
-      {
-        midiOut->getPortName(port);
-        MIDIDevice device;
-        device.props[static_cast<size_t>(MIDIProp::kName)] = QString::fromStdString(midiOut->getPortName(port));
-        device.props[static_cast<size_t>(MIDIProp::kPort)] = QString::number(port);
-        device.props[static_cast<size_t>(MIDIProp::kType)] = tr("Output");
-        devices.push_back(device);
-      }
-    }
+  }
+  catch (RtMidiError&)
+  {
   }
 
   m_MIDI->setRowCount(static_cast<int>(devices.size()));
@@ -1374,6 +1381,7 @@ void SettingsWidget::refreshMIDIDevices()
       {
         item = new QTableWidgetItem();
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        item->setForeground(device.color);
         m_MIDI->setItem(row, col, item);
       }
 
@@ -1425,17 +1433,6 @@ QString ProtocolComboBox::ProtocolName(Protocol protocol)
   }
 
   return tr("Unknown(%1)").arg(static_cast<int>(protocol));
-}
-
-bool ProtocolComboBox::ValidPort(Protocol protocol, unsigned short port)
-{
-  switch (protocol)
-  {
-    case Protocol::kArtNet:
-    case Protocol::kMIDI: return true;
-  }
-
-  return (port != 0);
 }
 
 Protocol ProtocolComboBox::SanitizedProtocol(int protocol)
@@ -1658,13 +1655,6 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.inActivity, /*fixed*/ true);
 
   row.inIP = new LineEdit(m_Cols->widget(col));
-  row.inIP->setToolTip(
-      tr("Only route packets received from this specific IP address\n"
-         "\n"
-         "Leave blank to route packets received from any IP address\n"
-         "\n"
-         "For multicast, use 2 comma separated IP addresses\n"
-         "(the first may be blank)"));
   if (route.src.multicastIP.isEmpty())
     row.inIP->setText(route.src.addr.ip);
   else
@@ -1672,7 +1662,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.inIP);
 
   row.inPort = new LineEdit(m_Cols->widget(col));
-  row.inPort->setText(ProtocolComboBox::ValidPort(route.src.protocol, route.src.addr.port) ? QString::number(route.src.addr.port) : QString());
+  row.inPort->setText(ValidPort(route.src.protocol, route.src.addr.port) ? QString::number(route.src.addr.port) : QString());
   AddCol(col++, row.inPort);
 
   row.inProtocol = new ProtocolComboBox(id, route.src.protocol, m_Cols->widget(col));
@@ -1725,12 +1715,11 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.outActivity, /*fixed*/ true);
 
   row.outIP = new LineEdit(m_Cols->widget(col));
-  row.outIP->setToolTip(tr("Route received packets to this IP address\n\nLeave blank to route packets to the same IP address they were sent from"));
   row.outIP->setText(route.dst.addr.ip);
   AddCol(col++, row.outIP);
 
   row.outPort = new LineEdit(m_Cols->widget(col));
-  row.outPort->setText(ProtocolComboBox::ValidPort(route.dst.protocol, route.dst.addr.port) ? QString::number(route.dst.addr.port) : QString());
+  row.outPort->setText(ValidPort(route.dst.protocol, route.dst.addr.port) ? QString::number(route.dst.addr.port) : QString());
   AddCol(col++, row.outPort);
 
   row.outProtocol = new ProtocolComboBox(id, route.dst.protocol, m_Cols->widget(col));
@@ -1948,7 +1937,7 @@ void RoutingWidget::SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemState
     route.src.protocol = row.inProtocol->GetProtocol();
 
     route.src.addr.port = row.inPort->text().toUShort();
-    if (!ProtocolComboBox::ValidPort(route.src.protocol, route.src.addr.port))
+    if (!ValidPort(route.src.protocol, route.src.addr.port))
       continue;  // port required
 
     route.enable = row.enable->isChecked();
@@ -2165,16 +2154,18 @@ void RoutingWidget::UpdateEnableState()
 
     row.mute->setEnabled(e && i != lastRow);
     row.label->setEnabled(e);
-    row.inIP->setEnabled(e);
+    row.inIP->setEnabled(e && protocol != Protocol::kMIDI);
     row.inPort->setEnabled(e);
     row.inProtocol->setEnabled(e);
-    row.inPath->setEnabled(protocol != Protocol::ksACN && protocol != Protocol::kArtNet);
+    row.inPath->setEnabled(e && protocol != Protocol::ksACN && protocol != Protocol::kArtNet);
     row.inMin->setEnabled(e);
     row.inMax->setEnabled(e);
 
     row.divider->setEnabled(e);
 
-    row.outIP->setEnabled(e);
+    protocol = row.outProtocol->GetProtocol();
+
+    row.outIP->setEnabled(e && protocol != Protocol::kMIDI);
     row.outPort->setEnabled(e);
     row.outProtocol->setEnabled(e);
     row.outPath->setEnabled(e);
@@ -2273,6 +2264,8 @@ void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
 
   const Row& r = m_Rows[row];
   Protocol outProtocol = r.outProtocol->GetProtocol();
+  r.inIP->setEnabled(r.enable->isChecked() && protocol != Protocol::kMIDI);
+  r.inIP->setToolTip(GetHelpText(Col::kInIP, protocol, outProtocol, /*script*/ false));
   r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, outProtocol, /*script*/ false));
   r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, outProtocol, /*script*/ false));
   r.inPath->setEnabled(r.enable->isChecked() && protocol != Protocol::ksACN && protocol != Protocol::kArtNet);
@@ -2293,6 +2286,8 @@ void RoutingWidget::onOutProtocolChanged(size_t row, Protocol protocol)
 
   const Row& r = m_Rows[row];
   Protocol inProtocol = r.inProtocol->GetProtocol();
+  r.outIP->setEnabled(r.enable->isChecked() && protocol != Protocol::kMIDI);
+  r.outIP->setToolTip(GetHelpText(Col::kOutIP, inProtocol, protocol, /*script*/ false));
   r.outPort->setToolTip(GetHelpText(Col::kOutPort, inProtocol, protocol, /*script*/ false));
   r.outPath->setToolTip(GetHelpText(Col::kOutPath, inProtocol, protocol, /*script*/ false));
   r.outScriptText->setToolTip(GetHelpText(Col::kOutPath, inProtocol, protocol, /*script*/ true));
@@ -2337,7 +2332,8 @@ void RoutingWidget::onHeaderHelpClicked(size_t id)
   if (sc)
   {
     QRect sr = sc->availableGeometry();
-    r.setSize(r.size().boundedTo(sr.size() - QSize(100, 100)));
+    sr.adjust(100, 100, -100, -100);
+    r.setSize(r.size().boundedTo(sr.size()));
     int overflow = sr.right() - r.right();
     if (overflow < 0)
       r.translate(overflow, 0);
@@ -2393,6 +2389,25 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
 
   switch (col)
   {
+    case Col::kInIP:
+    {
+      if (inProtocol == Protocol::kMIDI)
+      {
+        text = tr("Outgoing MIDI: IP is not used");
+      }
+      else
+      {
+        text =
+            tr("Only route packets received from this specific IP address\n"
+               "\n"
+               "Leave blank to route packets received from any IP address\n"
+               "\n"
+               "For multicast, use 2 comma separated IP addresses\n"
+               "(the first may be blank)");
+      }
+    }
+    break;
+
     case Col::kInPort:
     {
       switch (inProtocol)
@@ -2411,8 +2426,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
       {
         text =
             tr("Only route received OSC commands with this specific OSC command path\n"
-               "(use * for wildcard matching, ex: /eos/out/event/*)\n"
-               "\n"
+               "(use * for wildcard matching, ex: /eos/out/event/*)\n\n"
                "Leave blank to route received packets with any OSC command path (or non-OSC packets)");
       }
 
@@ -2459,11 +2473,36 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "    /psn/<id>/pos/speed/orientation/acceleration/...");
       }
 
+      if (all || inProtocol == Protocol::kMIDI)
+      {
+        if (!text.isEmpty())
+          text += "\n\n";
+
+        text +=
+            tr("Incoming MIDI:\n"
+               "  /midi=a,b,c...");
+      }
+
       if (!all)
       {
         text +=
             tr("\n\n"
                "Click the [?] button for advanced examples & options");
+      }
+    }
+    break;
+
+    case Col::kOutIP:
+    {
+      if (outProtocol == Protocol::kMIDI)
+      {
+        text = tr("Outgoing MIDI: IP is not used");
+      }
+      else
+      {
+        text =
+            tr("Route received packets to this IP address\n\n"
+               "Leave blank to route packets to the same IP address they were sent from");
       }
     }
     break;
@@ -2617,6 +2656,24 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "Input:  /hoist/xyz, 10(f), 20(f), 30(f)\n"
                "Path:   /psn/1/pos=%3,%4,%5\n"
                "Output: PSN packet: tracker id 1, pos(10, 20, 30)");
+      }
+
+      if (all || inProtocol == Protocol::kMIDI || outProtocol == Protocol::kMIDI)
+      {
+        text +=
+            tr("\n\n"
+               "Incoming/Outgoing MIDI:\n"
+               "    /midi=a,b,c...\n"
+               "\n"
+               "Ex: MIDI to OSC\n"
+               "Input:  /midi, 255(i), 0(i), 127(i)\n"
+               "Path:   /eos/chan/1/param/red/green/blue=%2,%3,%4\n"
+               "Output: /eos/chan/1/param/red/green/blue, 255(f), 0(f), 127(f)\n"
+               "\n"
+               "Ex: OSC to MIDI\n"
+               "Input:  /rgb, 255(f), 0(f), 127(f)\n"
+               "Path:   /midi=%2,%3,%4\n"
+               "Output: MIDI packet: 255, 0, 127");
       }
 
       if (script)

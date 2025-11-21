@@ -2501,17 +2501,8 @@ void RouterThread::SendMIDI(MIDI &midi, const sRouteDst &routeDst, EosPacket &os
   try
   {
     portIter->second.midi->sendMessage(&message);
-
     SetItemActivity(routeDst.dstItemStateTableId);
-
-    std::string log = "MIDI OUT [" + portIter->second.name + "] ";
-    for (size_t i = 0; i < message.size(); ++i)
-    {
-      if (i != 0)
-        log += ' ';
-      log += std::to_string(message[i]);
-    }
-    m_PrivateLog.Add(EosLog::LOG_MSG_TYPE_SEND, log);
+    LogMIDI(/*send*/ true, portIter->second.name, message);
   }
   catch (RtMidiError &error)
   {
@@ -3325,14 +3316,7 @@ void RouterThread::RecvMIDI(bool muteAllIncoming, bool muteAllOutgoing, sACN &sa
     if (message.empty() || muteAllIncoming)
       continue;
 
-    std::string log = "MIDI IN  [" + portIter->second.name + "] ";
-    for (size_t i = 0; i < message.size(); ++i)
-    {
-      if (i != 0)
-        log += ' ';
-      log += std::to_string(message[i]);
-    }
-    m_PrivateLog.Add(EosLog::LOG_MSG_TYPE_RECV, log);
+    LogMIDI(/*send*/ false, portIter->second.name, message);
 
     OSCPacketWriter osc("/midi");
     for (size_t i = 0; i < message.size(); ++i)
@@ -3519,6 +3503,31 @@ void RouterThread::UniverseData(const CID &source, const char *source_name, cons
     if (slot_count != 0 && pdata)
       memcpy(recvUniverse.channelPriority.data(), pdata, std::min(recvUniverse.channelPriority.size(), static_cast<size_t>(slot_count)));
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void RouterThread::LogMIDI(bool send, const std::string &name, const std::vector<unsigned char> &message)
+{
+  const char *kHex = "0123456789ABCDEF";
+
+  std::string log = send ? "MIDI OUT [" : "MIDI IN  [";
+  log += name;
+  log += "]";
+
+  size_t hexOffset = log.size();
+  log.resize(hexOffset + message.size() * 3);
+
+  for (size_t i = 0; i < message.size(); ++i)
+  {
+    unsigned char c = message[i];
+    size_t offset = hexOffset + i * 3;
+    log[offset] = ' ';
+    log[offset + 1] = kHex[(c >> 4) & 0x0f];
+    log[offset + 2] = kHex[c & 0x0f];
+  }
+
+  m_PrivateLog.Add(send ? EosLog::LOG_MSG_TYPE_SEND : EosLog::LOG_MSG_TYPE_RECV, log);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

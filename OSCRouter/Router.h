@@ -617,6 +617,7 @@ protected:
   virtual void SetItemActivity(ItemStateTable::ID id);
   virtual void DestroysACN(sACN &sacn);
   virtual void DestroyArtNet(ArtNet &artnet);
+  virtual void LogMIDI(bool send, const std::string &name, const std::vector<unsigned char> &message);
 
   // OSCParserClient
   virtual void OSCParserClient_Log(const std::string &message);

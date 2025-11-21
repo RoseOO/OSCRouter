@@ -1666,7 +1666,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.inPort);
 
   row.inProtocol = new ProtocolComboBox(id, route.src.protocol, m_Cols->widget(col));
-  connect(row.inProtocol, &ProtocolComboBox::protocolChanged, this, &RoutingWidget::onInProtocolChanged);
+  connect(row.inProtocol, &ProtocolComboBox::protocolChanged, this, &RoutingWidget::onProtocolChanged);
   AddCol(col++, row.inProtocol, /*fixed*/ true);
 
   row.inPath = new LineEdit(m_Cols->widget(col));
@@ -1723,7 +1723,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   AddCol(col++, row.outPort);
 
   row.outProtocol = new ProtocolComboBox(id, route.dst.protocol, m_Cols->widget(col));
-  connect(row.outProtocol, &ProtocolComboBox::protocolChanged, this, &RoutingWidget::onOutProtocolChanged);
+  connect(row.outProtocol, &ProtocolComboBox::protocolChanged, this, &RoutingWidget::onProtocolChanged);
   AddCol(col++, row.outProtocol, /*fixed*/ true);
 
   row.outPath = new LineEdit(m_Cols->widget(col));
@@ -1766,8 +1766,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
 
   m_Rows.push_back(row);
 
-  onInProtocolChanged(m_Rows.size() - 1, route.src.protocol);
-  onOutProtocolChanged(m_Rows.size() - 1, route.dst.protocol);
+  onProtocolChanged(m_Rows.size() - 1, Protocol::kInvalid);
 }
 
 void RoutingWidget::AddCol(int index, QWidget* w, bool fixed /*= false*/, bool fixedHeight /*= false*/)
@@ -2257,48 +2256,42 @@ void RoutingWidget::onAddRemoveClicked(size_t id)
   LoadRoutes(routes, itemStateTable);
 }
 
-void RoutingWidget::onInProtocolChanged(size_t row, Protocol protocol)
-{
-  if (row >= m_Rows.size())
-    return;
-
-  const Row& r = m_Rows[row];
-  Protocol outProtocol = r.outProtocol->GetProtocol();
-  r.inIP->setEnabled(r.enable->isChecked() && protocol != Protocol::kMIDI);
-  r.inIP->setToolTip(GetHelpText(Col::kInIP, protocol, outProtocol, /*script*/ false));
-  r.inPort->setToolTip(GetHelpText(Col::kInPort, protocol, outProtocol, /*script*/ false));
-  r.inPath->setToolTip(GetHelpText(Col::kInPath, protocol, outProtocol, /*script*/ false));
-  r.inPath->setEnabled(r.enable->isChecked() && protocol != Protocol::ksACN && protocol != Protocol::kArtNet);
-
-  if (protocol != Protocol::kPSN)
-    return;
-
-  if (r.inIP->text().isEmpty())
-    r.inIP->setText(QLatin1String(",") + Router::GetDefaultPSNIP());
-  if (r.inPort->text().isEmpty())
-    r.inPort->setText(QString::number(Router::GetDefaultPSNPort()));
-}
-
-void RoutingWidget::onOutProtocolChanged(size_t row, Protocol protocol)
+void RoutingWidget::onProtocolChanged(size_t row, Protocol /*protocol*/)
 {
   if (row >= m_Rows.size())
     return;
 
   const Row& r = m_Rows[row];
   Protocol inProtocol = r.inProtocol->GetProtocol();
-  r.outIP->setEnabled(r.enable->isChecked() && protocol != Protocol::kMIDI);
-  r.outIP->setToolTip(GetHelpText(Col::kOutIP, inProtocol, protocol, /*script*/ false));
-  r.outPort->setToolTip(GetHelpText(Col::kOutPort, inProtocol, protocol, /*script*/ false));
-  r.outPath->setToolTip(GetHelpText(Col::kOutPath, inProtocol, protocol, /*script*/ false));
-  r.outScriptText->setToolTip(GetHelpText(Col::kOutPath, inProtocol, protocol, /*script*/ true));
+  Protocol outProtocol = r.outProtocol->GetProtocol();
 
-  if (protocol != Protocol::kPSN)
-    return;
+  r.inIP->setEnabled(r.enable->isChecked() && inProtocol != Protocol::kMIDI);
+  r.inIP->setToolTip(GetHelpText(Col::kInIP, inProtocol, outProtocol, /*script*/ false));
+  r.inPort->setToolTip(GetHelpText(Col::kInPort, inProtocol, outProtocol, /*script*/ false));
+  r.inPath->setToolTip(GetHelpText(Col::kInPath, inProtocol, outProtocol, /*script*/ false));
+  r.inPath->setEnabled(r.enable->isChecked() && inProtocol != Protocol::ksACN && inProtocol != Protocol::kArtNet);
 
-  if (r.outIP->text().isEmpty())
-    r.outIP->setText(QLatin1String(",") + Router::GetDefaultPSNIP());
-  if (r.outPort->text().isEmpty())
-    r.outPort->setText(QString::number(Router::GetDefaultPSNPort()));
+  if (inProtocol == Protocol::kPSN)
+  {
+    if (r.inIP->text().isEmpty())
+      r.inIP->setText(QLatin1String(",") + Router::GetDefaultPSNIP());
+    if (r.inPort->text().isEmpty())
+      r.inPort->setText(QString::number(Router::GetDefaultPSNPort()));
+  }
+
+  r.outIP->setEnabled(r.enable->isChecked() && outProtocol != Protocol::kMIDI);
+  r.outIP->setToolTip(GetHelpText(Col::kOutIP, inProtocol, outProtocol, /*script*/ false));
+  r.outPort->setToolTip(GetHelpText(Col::kOutPort, inProtocol, outProtocol, /*script*/ false));
+  r.outPath->setToolTip(GetHelpText(Col::kOutPath, inProtocol, outProtocol, /*script*/ false));
+  r.outScriptText->setToolTip(GetHelpText(Col::kOutPath, inProtocol, outProtocol, /*script*/ true));
+
+  if (outProtocol == Protocol::kPSN)
+  {
+    if (r.outIP->text().isEmpty())
+      r.outIP->setText(QLatin1String(",") + Router::GetDefaultPSNIP());
+    if (r.outPort->text().isEmpty())
+      r.outPort->setText(QString::number(Router::GetDefaultPSNPort()));
+  }
 }
 
 void RoutingWidget::onHeaderHelpClicked(size_t id)

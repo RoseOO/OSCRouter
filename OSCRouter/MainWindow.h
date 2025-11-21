@@ -443,8 +443,7 @@ private slots:
   void onMuteRouteToggled(size_t row, bool checked);
   void onOutScriptToggled(size_t id, bool checked);
   void onAddRemoveClicked(size_t id);
-  void onInProtocolChanged(size_t row, Protocol protocol);
-  void onOutProtocolChanged(size_t row, Protocol protocol);
+  void onProtocolChanged(size_t row, Protocol protocol);
   void onHeaderHelpClicked(size_t id);
 
 protected:

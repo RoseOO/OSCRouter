@@ -1549,6 +1549,7 @@ void RouterThread::BuildMIDI(ROUTES_BY_PORT &routesByMIDI, MIDI &midi)
     {
       std::shared_ptr<RtMidiIn> input = std::make_shared<RtMidiIn>();
       input->openPort(port, VER_PRODUCTNAME_STR);
+      input->ignoreTypes(/*midiSysex*/ false, /*midiTime*/ false, /*midiSense*/ false);
       midiIn.name = input->getPortName(port);
       midiIn.midi = input;
     }

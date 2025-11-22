@@ -2479,18 +2479,75 @@ void RouterThread::SendMIDI(MIDI &midi, const sRouteDst &routeDst, EosPacket &os
     SetItemState(routeDst.dstItemStateTableId, ItemState::STATE_CONNECTED);
   }
 
+  // find osc path null terminator
+  QString path;
   size_t argCount = 0xffffffff;
-  OSCArgument *args = OSCArgument::GetArgs(oscPacket.GetData(), static_cast<size_t>(oscPacket.GetSize()), argCount);
-  if (!args)
-    return;
+  OSCArgument *args = nullptr;
+  char *data = oscPacket.GetData();
+  if (data)
+  {
+    for (int i = 0; i < oscPacket.GetSize(); i++)
+    {
+      if (data[i] == 0)
+      {
+        path = QString::fromUtf8(data);
+        args = OSCArgument::GetArgs(&data[i], static_cast<size_t>(oscPacket.GetSize()), argCount);
+        break;
+      }
+    }
+  }
 
   std::vector<unsigned char> message;
-  message.reserve(argCount);
-  for (size_t i = 0; i < argCount; ++i)
+
+  QStringList parts = path.split(QLatin1Char('/'));
+  qDebug() << parts;
+  if (parts.size() > 1 && parts[1] == QLatin1String("msc"))
   {
-    int n = 0;
-    if (args[i].GetInt(n))
-      message.push_back(n);
+    message.push_back(static_cast<unsigned char>(MSC::kSysEx));
+    message.push_back(static_cast<unsigned char>(MSC::kSysExStart));
+    message.push_back((parts.size() > 2) ? static_cast<unsigned char>(parts[2].toInt()) : static_cast<unsigned char>(0x01u));
+    message.push_back(static_cast<unsigned char>(MSC::kMSC));
+    message.push_back((parts.size() > 3) ? static_cast<unsigned char>(parts[3].toInt()) : static_cast<unsigned char>(MSC::kLightingFormat));
+
+    MSCCmd cmd = MSCCmd::kGo;
+    if (parts.size() > 4)
+    {
+      std::optional<MSCCmd> named = MSCCmdForName(parts[4]);
+      if (named.has_value())
+        cmd = named.value();
+    }
+    message.push_back(MSCCmdValue(cmd));
+
+    if (args)
+    {
+      std::string str;
+      bool terminatePrevStr = false;
+      for (size_t argIndex = 0; argIndex < argCount; ++argIndex)
+      {
+        if (!args[argIndex].GetString(str) || str.empty())
+          continue;
+
+        if (terminatePrevStr)
+          message.push_back(0);
+
+        for (size_t strIndex = 0; strIndex < str.size(); ++strIndex)
+          message.push_back(static_cast<unsigned char>(str[strIndex]));
+
+        terminatePrevStr = true;
+      }
+    }
+
+    message.push_back(static_cast<unsigned char>(MSC::kSysExEnd));
+  }
+  else if (args)
+  {
+    message.reserve(argCount);
+    for (size_t i = 0; i < argCount; ++i)
+    {
+      int n = 0;
+      if (args[i].GetInt(n))
+        message.push_back(n);
+    }
   }
 
   delete[] args;
@@ -3318,20 +3375,61 @@ void RouterThread::RecvMIDI(bool muteAllIncoming, bool muteAllOutgoing, sACN &sa
 
     LogMIDI(/*send*/ false, portIter->second.name, message);
 
-    OSCPacketWriter osc("/midi");
-    for (size_t i = 0; i < message.size(); ++i)
-      osc.AddInt32(message[i]);
+    // raw MIDI
+    {
+      OSCPacketWriter osc("/midi");
+      for (size_t i = 0; i < message.size(); ++i)
+        osc.AddInt32(message[i]);
 
-    size_t oscPacketSize = 0;
-    char *oscPacket = osc.Create(oscPacketSize);
-    if (!oscPacket)
-      continue;
+      size_t oscPacketSize = 0;
+      char *oscPacket = osc.Create(oscPacketSize);
+      if (oscPacket)
+      {
+        addr.port = static_cast<unsigned short>(portIter->first);
+        EosUdpInThread::sRecvPacket packet(oscPacket, static_cast<int>(oscPacketSize), /*Ip*/ 0);
+        delete[] oscPacket;
 
-    addr.port = static_cast<unsigned short>(portIter->first);
-    EosUdpInThread::sRecvPacket packet(oscPacket, static_cast<int>(oscPacketSize), /*Ip*/ 0);
-    delete[] oscPacket;
+        ProcessRecvPacket(muteAllOutgoing, sacn, artnet, midi, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, addr, Protocol::kOSC, packet);
+      }
+    }
 
-    ProcessRecvPacket(muteAllOutgoing, sacn, artnet, midi, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, addr, Protocol::kOSC, packet);
+    // MIDI Show Control
+    if (message.size() >= 8 && static_cast<MSC>(message[0]) == MSC::kSysEx && static_cast<MSC>(message[1]) == MSC::kSysExStart && static_cast<MSC>(message[3]) == MSC::kMSC)
+    {
+      OSCPacketWriter osc("/msc/" + std::to_string(message[2]) + "/" + std::to_string(message[4]) + "/" + MSCCmdName(static_cast<MSCCmd>(message[5])).toStdString());
+
+      std::string str;
+      for (size_t i = 6; i < message.size(); ++i)
+      {
+        unsigned char c = message[i];
+        if (c == 0)
+        {
+          if (!str.empty())
+            osc.AddString(str);
+          str.clear();
+          continue;
+        }
+
+        if (c == 0xf7u)
+          break;
+
+        str += static_cast<char>(c);
+      }
+
+      if (!str.empty())
+        osc.AddString(str);
+
+      size_t oscPacketSize = 0;
+      char *oscPacket = osc.Create(oscPacketSize);
+      if (oscPacket)
+      {
+        addr.port = static_cast<unsigned short>(portIter->first);
+        EosUdpInThread::sRecvPacket packet(oscPacket, static_cast<int>(oscPacketSize), /*Ip*/ 0);
+        delete[] oscPacket;
+
+        ProcessRecvPacket(muteAllOutgoing, sacn, artnet, midi, routesByPort, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads, addr, Protocol::kOSC, packet);
+      }
+    }
   }
 }
 

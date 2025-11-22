@@ -27,6 +27,7 @@
 #endif
 
 #include <vector>
+#include <optional>
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -92,6 +93,35 @@ enum class Protocol
 };
 
 bool ValidPort(Protocol protocol, unsigned short port);
+
+////////////////////////////////////////////////////////////////////////////////
+
+enum class MSCCmd
+{
+  kGo = 0,
+  kPause,
+  kResume,
+  kTimedGo,
+  kSet,
+  kFader,
+  kMacro,
+  kOff,
+
+  kCount
+};
+
+enum class MSC
+{
+  kSysEx = 0xf0,
+  kSysExStart = 0x7fu,
+  kSysExEnd = 0xf7u,
+  kMSC = 0x2u,
+  kLightingFormat = 0x01u
+};
+
+unsigned char MSCCmdValue(MSCCmd cmd);
+QString MSCCmdName(MSCCmd cmd);
+std::optional<MSCCmd> MSCCmdForName(const QString &name);
 
 ////////////////////////////////////////////////////////////////////////////////
 

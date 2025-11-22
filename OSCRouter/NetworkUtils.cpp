@@ -169,6 +169,56 @@ bool ValidPort(Protocol protocol, unsigned short port)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+unsigned char MSCCmdValue(MSCCmd cmd)
+{
+  switch (cmd)
+  {
+    case MSCCmd::kGo: return 0x01u;
+    case MSCCmd::kPause: return 0x02u;
+    case MSCCmd::kResume: return 0x03u;
+    case MSCCmd::kTimedGo: return 0x04u;
+    case MSCCmd::kSet: return 0x05u;
+    case MSCCmd::kFader: return 0x06u;
+    case MSCCmd::kMacro: return 0x07u;
+    case MSCCmd::kOff: return 0x0au;
+  }
+
+  return static_cast<unsigned char>(cmd);
+}
+
+QString MSCCmdName(MSCCmd cmd)
+{
+  switch (cmd)
+  {
+    case MSCCmd::kGo: return QLatin1String("go");
+    case MSCCmd::kPause: return QLatin1String("pause");
+    case MSCCmd::kResume: return QLatin1String("resume");
+    case MSCCmd::kTimedGo: return QLatin1String("timedGo");
+    case MSCCmd::kSet: return QLatin1String("set");
+    case MSCCmd::kFader: return QLatin1String("fader");
+    case MSCCmd::kMacro: return QLatin1String("macro");
+    case MSCCmd::kOff: return QLatin1String("off");
+  }
+
+  return QString::number(static_cast<int>(cmd));
+}
+
+std::optional<MSCCmd> MSCCmdForName(const QString &name)
+{
+  if (name.isEmpty())
+    return std::nullopt;
+
+  for (int i = 0; i < static_cast<int>(MSCCmd::kCount); ++i)
+  {
+    if (name.compare(MSCCmdName(static_cast<MSCCmd>(i)), Qt::CaseInsensitive) == 0)
+      return static_cast<MSCCmd>(i);
+  }
+
+  return std::nullopt;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 EosRouteSrc::EosRouteSrc(const EosAddr &Addr, Protocol Protocol, const QString &Path)
   : addr(Addr)
   , protocol(Protocol)

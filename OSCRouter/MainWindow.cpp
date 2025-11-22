@@ -2473,7 +2473,10 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
 
         text +=
             tr("Incoming MIDI:\n"
-               "  /midi=a,b,c...");
+               "  Raw:\n"
+               "    /midi=a,b,c...\n"
+               "  MIDI Show Control:\n"
+               "    /msc/<device ID>/<command format>/<command>=<string 1>, <string 2>, etc...");
       }
 
       if (!all)
@@ -2653,11 +2656,26 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
 
       if (all || inProtocol == Protocol::kMIDI || outProtocol == Protocol::kMIDI)
       {
+        QString mscCommands;
+        for (int i = 0; i < static_cast<int>(MSCCmd::kCount); ++i)
+        {
+          if (i > 0)
+            mscCommands += QLatin1String(", ");
+          mscCommands += MSCCmdName(static_cast<MSCCmd>(i));
+        }
+
         text +=
             tr("\n\n"
                "Incoming/Outgoing MIDI:\n"
+               "  Raw:\n"
                "    /midi=a,b,c...\n"
-               "\n"
+               "  MIDI Show Control:\n");
+
+        for (int i = 0; i < static_cast<int>(MSCCmd::kCount); ++i)
+          text += QStringLiteral("    /msc/<device ID>/<command format>/%1=<string 1>, <string 2>, etc...\n").arg(MSCCmdName(static_cast<MSCCmd>(i)));
+
+        text +=
+            tr("\n"
                "Ex: MIDI to OSC\n"
                "Input:  /midi, 255(i), 0(i), 127(i)\n"
                "Path:   /eos/chan/1/param/red/green/blue=%2,%3,%4\n"
@@ -2666,7 +2684,17 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "Ex: OSC to MIDI\n"
                "Input:  /rgb, 255(f), 0(f), 127(f)\n"
                "Path:   /midi=%2,%3,%4\n"
-               "Output: MIDI packet: 255, 0, 127");
+               "Output: MIDI packet: FF 00 7F\n"
+               "\n"
+               "Ex: MSC to OSC\n"
+               "Input:  /msc/2/1/go, 3(i), 4(i)\n"
+               "Path:   /eos/cue/%6/%5/fire\n"
+               "Output: /eos/cue/4/3/fire\n"
+               "\n"
+               "Ex: OSC to MSC\n"
+               "Input:  /eos/out/event/cue/1/3/fire\n"
+               "Path:   /msc/2/1/go=%6,%5\n"
+               "Output: MIDI packet: F0 7F 04 02 05 01 33 00 31 F7\n");
       }
 
       if (script)

@@ -759,11 +759,19 @@ void EosTcpClientThread::run()
       outPacketLogger.SetPrefix(QString("TCP OUT [%1:%2] ").arg(m_Addr.ip).arg(m_Addr.port).toUtf8().constData());
 
       // connect
-      while (m_Run && tcp->GetConnectState() == EosTcp::CONNECT_IN_PROGRESS)
+      if (m_Run && tcp->GetConnectState() == EosTcp::CONNECT_IN_PROGRESS)
       {
-        tcp->Tick(m_PrivateLog);
-        UpdateLog();
-        msleep(10);
+        reconnectTimer.Start();
+        for (;;)
+        {
+          tcp->Tick(m_PrivateLog);
+          UpdateLog();
+
+          if (!m_Run || tcp->GetConnectState() != EosTcp::CONNECT_IN_PROGRESS || reconnectTimer.GetExpired(m_ReconnectDelay))
+            break;
+
+          msleep(10);
+        }
       }
 
       if (tcp->GetConnectState() == EosTcp::CONNECT_CONNECTED)

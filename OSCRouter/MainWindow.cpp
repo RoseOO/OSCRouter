@@ -2500,7 +2500,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "  MIDI Show Control:\n");
 
         for (int i = 0; i < static_cast<int>(MSCCmd::kCount); ++i)
-          text += QStringLiteral("    /msc/<device ID>/<command format>/%1=<string 1>, <string 2>, etc...\n").arg(MSCCmdName(static_cast<MSCCmd>(i)));
+          text += QStringLiteral("    /msc/<device ID>/<command format>/%1\n").arg(MSCCmdName(static_cast<MSCCmd>(i)));
       }
 
       if (!all)
@@ -2696,7 +2696,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "  MIDI Show Control:\n");
 
         for (int i = 0; i < static_cast<int>(MSCCmd::kCount); ++i)
-          text += QStringLiteral("    /msc/<device ID>/<command format>/%1=<string 1>, <string 2>, etc...\n").arg(MSCCmdName(static_cast<MSCCmd>(i)));
+          text += QStringLiteral("    /msc/<device ID>/<command format>/%1\n").arg(MSCCmdName(static_cast<MSCCmd>(i)));
 
         text +=
             tr("\n"
@@ -2712,7 +2712,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "\n"
                "Ex: MSC to OSC\n"
                "Input:  /msc/2/1/go, 3(i), 4(i)\n"
-               "Path:   /eos/cue/%6/%5/fire\n"
+               "Path:   /eos/cue/%6/%5/fire=\n"
                "Output: /eos/cue/4/3/fire\n"
                "\n"
                "Ex: OSC to MSC\n"

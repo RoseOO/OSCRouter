@@ -186,6 +186,23 @@ unsigned char MSCCmdValue(MSCCmd cmd)
   return static_cast<unsigned char>(cmd);
 }
 
+MSCCmd ValueMSCCmd(unsigned char value)
+{
+  switch (value)
+  {
+    case 0x01u: return MSCCmd::kGo;
+    case 0x02u: return MSCCmd::kPause;
+    case 0x03u: return MSCCmd::kResume;
+    case 0x04u: return MSCCmd::kTimedGo;
+    case 0x05u: return MSCCmd::kSet;
+    case 0x06u: return MSCCmd::kFader;
+    case 0x07u: return MSCCmd::kMacro;
+    case 0x0au: return MSCCmd::kOff;
+  }
+
+  return MSCCmd::kCount;
+}
+
 QString MSCCmdName(MSCCmd cmd)
 {
   switch (cmd)
@@ -201,6 +218,21 @@ QString MSCCmdName(MSCCmd cmd)
   }
 
   return QString::number(static_cast<int>(cmd));
+}
+
+bool MSCCmdStrings(MSCCmd cmd)
+{
+  switch (cmd)
+  {
+    case MSCCmd::kGo:
+    case MSCCmd::kPause:
+    case MSCCmd::kResume:
+    case MSCCmd::kTimedGo: return true;
+
+    default: break;
+  }
+
+  return false;
 }
 
 std::optional<MSCCmd> MSCCmdForName(const QString &name)

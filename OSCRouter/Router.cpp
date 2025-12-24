@@ -382,7 +382,6 @@ void EosUdpInThread::run()
       OSCParser logParser;
       logParser.SetRoot(new OSCMethod());
       PacketLogger packetLogger(EosLog::LOG_MSG_TYPE_RECV, m_PrivateLog);
-      std::string logPrefix;
       sockaddr_in addr;
 
       // run
@@ -2529,20 +2528,32 @@ void RouterThread::SendMIDI(MIDI &midi, const sRouteDst &routeDst, EosPacket &os
 
     if (args)
     {
-      std::string str;
-      bool terminatePrevStr = false;
-      for (size_t argIndex = 0; argIndex < argCount; ++argIndex)
+      if (MSCCmdStrings(cmd))
       {
-        if (!args[argIndex].GetString(str) || str.empty())
-          continue;
+        std::string str;
+        bool terminatePrevStr = false;
+        for (size_t argIndex = 0; argIndex < argCount; ++argIndex)
+        {
+          if (!args[argIndex].GetString(str) || str.empty())
+            continue;
 
-        if (terminatePrevStr)
-          message.push_back(0);
+          if (terminatePrevStr)
+            message.push_back(0);
 
-        for (size_t strIndex = 0; strIndex < str.size(); ++strIndex)
-          message.push_back(static_cast<unsigned char>(str[strIndex]));
+          for (size_t strIndex = 0; strIndex < str.size(); ++strIndex)
+            message.push_back(static_cast<unsigned char>(str[strIndex]));
 
-        terminatePrevStr = true;
+          terminatePrevStr = true;
+        }
+      }
+      else
+      {
+        int n = 0;
+        for (size_t argIndex = 0; argIndex < argCount; ++argIndex)
+        {
+          if (args[argIndex].GetInt(n))
+            message.push_back(static_cast<unsigned char>(n));
+        }
       }
     }
 
@@ -2920,6 +2931,7 @@ void RouterThread::run()
 
   OSCParser oscBundleParser;
   oscBundleParser.SetRoot(new OSCBundleMethod());
+  PacketLogger packetLogger(EosLog::LOG_MSG_TYPE_RECV, m_PrivateLog);
 
   BuildRoutes(routesByPort, routesBysACNUniverse, routesByArtNetUniverse, routesByMIDI, udpInThreads, udpOutThreads, tcpClientThreads, tcpServerThreads);
 
@@ -2975,7 +2987,7 @@ void RouterThread::run()
     }
 
     // MIDI input
-    RecvMIDI(muteAll.incoming, muteAll.outgoing, sacn, artnet, midi, routesByMIDI, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads);
+    RecvMIDI(oscBundleParser, packetLogger, muteAll.incoming, muteAll.outgoing, sacn, artnet, midi, routesByMIDI, routingDestinationList, udpOutThreads, tcpServerThreads, tcpClientThreads);
 
     // UDP input
     for (UDP_IN_THREADS::iterator i = udpInThreads.begin(); i != udpInThreads.end();)
@@ -3366,8 +3378,8 @@ void RouterThread::RecvArtNet(ArtNet &artnet, EosUdpInThread::RECV_PORT_Q &recvQ
   artnet.dirty.clear();
 }
 
-void RouterThread::RecvMIDI(bool muteAllIncoming, bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, MIDI &midi, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList,
-                            UDP_OUT_THREADS &udpOutThreads, TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads)
+void RouterThread::RecvMIDI(OSCParser &oscParser, PacketLogger &packetLogger, bool muteAllIncoming, bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, MIDI &midi, ROUTES_BY_PORT &routesByPort,
+                            DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads, TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads)
 {
   if (midi.inputs.empty())
     return;
@@ -3391,6 +3403,8 @@ void RouterThread::RecvMIDI(bool muteAllIncoming, bool muteAllOutgoing, sACN &sa
 
     LogMIDI(/*send*/ false, portIter->second.name, message);
 
+    packetLogger.SetPrefix(QStringLiteral("MIDI IN  [%1] ").arg(portIter->second.name).toUtf8().constData());
+
     // raw MIDI
     {
       OSCPacketWriter osc("/midi");
@@ -3402,6 +3416,7 @@ void RouterThread::RecvMIDI(bool muteAllIncoming, bool muteAllOutgoing, sACN &sa
       if (oscPacket)
       {
         addr.port = static_cast<unsigned short>(portIter->first);
+        packetLogger.PrintPacket(oscParser, oscPacket, oscPacketSize);
         EosUdpInThread::sRecvPacket packet(oscPacket, static_cast<int>(oscPacketSize), /*Ip*/ 0);
         delete[] oscPacket;
 
@@ -3412,34 +3427,48 @@ void RouterThread::RecvMIDI(bool muteAllIncoming, bool muteAllOutgoing, sACN &sa
     // MIDI Show Control
     if (message.size() >= 8 && static_cast<MSC>(message[0]) == MSC::kSysEx && static_cast<MSC>(message[1]) == MSC::kSysExStart && static_cast<MSC>(message[3]) == MSC::kMSC)
     {
-      OSCPacketWriter osc("/msc/" + std::to_string(message[2]) + "/" + std::to_string(message[4]) + "/" + MSCCmdName(static_cast<MSCCmd>(message[5])).toStdString());
+      MSCCmd mscCmd = ValueMSCCmd(message[5]);
+      OSCPacketWriter osc("/msc/" + std::to_string(message[2]) + "/" + std::to_string(message[4]) + "/" + MSCCmdName(mscCmd).toStdString());
 
-      std::string str;
-      for (size_t i = 6; i < message.size(); ++i)
+      if (MSCCmdStrings(mscCmd))
       {
-        unsigned char c = message[i];
-        if (c == 0)
+        std::string str;
+        for (size_t i = 6; i < message.size(); ++i)
         {
-          if (!str.empty())
-            osc.AddString(str);
-          str.clear();
-          continue;
+          if (message[i] == 0)
+          {
+            if (!str.empty())
+              osc.AddString(str);
+            str.clear();
+            continue;
+          }
+
+          if (message[i] == static_cast<unsigned char>(MSC::kSysExEnd))
+            break;
+
+          str += static_cast<char>(message[i]);
         }
 
-        if (c == 0xf7u)
-          break;
-
-        str += static_cast<char>(c);
+        if (!str.empty())
+          osc.AddString(str);
       }
+      else
+      {
+        for (size_t i = 6; i < message.size(); ++i)
+        {
+          if (message[i] == static_cast<unsigned char>(MSC::kSysExEnd))
+            break;
 
-      if (!str.empty())
-        osc.AddString(str);
+          osc.AddInt32(static_cast<int32_t>(message[i]));
+        }
+      }
 
       size_t oscPacketSize = 0;
       char *oscPacket = osc.Create(oscPacketSize);
       if (oscPacket)
       {
         addr.port = static_cast<unsigned short>(portIter->first);
+        packetLogger.PrintPacket(oscParser, oscPacket, oscPacketSize);
         EosUdpInThread::sRecvPacket packet(oscPacket, static_cast<int>(oscPacketSize), /*Ip*/ 0);
         delete[] oscPacket;
 

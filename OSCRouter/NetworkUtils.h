@@ -120,7 +120,9 @@ enum class MSC
 };
 
 unsigned char MSCCmdValue(MSCCmd cmd);
+MSCCmd ValueMSCCmd(unsigned char value);
 QString MSCCmdName(MSCCmd cmd);
+bool MSCCmdStrings(MSCCmd cmd);
 std::optional<MSCCmd> MSCCmdForName(const QString &name);
 
 ////////////////////////////////////////////////////////////////////////////////

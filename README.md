@@ -1,4 +1,4 @@
-[example.osc.txt](https://github.com/user-attachments/files/24332375/example.osc.txt)[example.osc.txt](https://github.com/user-attachments/files/24332364/example.osc.txt)Simple UDP/TCP packet router for Mac and Windows, with optional OSC specific options
+Simple UDP/TCP packet router for Mac and Windows, with optional OSC specific options
 
 ⭐ Now with support for sACN, ArtNet, PosiStageNet (PSN), MIDI, and Javascript
 
@@ -7,7 +7,7 @@
 
 ## Example File (pictured above)
 
-[example.osc.txt](https://github.com/user-attachments/files/23556850/example.osc.txt)
+[example.osc.txt](https://github.com/user-attachments/files/24332375/example.osc.txt)
 
 
 ## About this ETCLabs Project

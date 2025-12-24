@@ -20,6 +20,7 @@
 // THE SOFTWARE.
 
 #include "LogWidget.h"
+#include "UI.h"
 
 // must be last include
 #include "LeakWatcher.h"
@@ -39,7 +40,7 @@ LogWidget::LogWidget(size_t maxLineCount, QWidget *parent)
   pal.setColor(QPalette::Base, DARK_BG_COLOR);
   setPalette(pal);
 
-  setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+  setFont(UI::FixedFont());
 
   m_VScrollBar = new QScrollBar(Qt::Vertical, this);
   connect(m_VScrollBar, SIGNAL(valueChanged(int)), this, SLOT(onVScrollChanged(int)));

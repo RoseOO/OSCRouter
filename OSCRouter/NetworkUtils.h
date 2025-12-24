@@ -159,7 +159,6 @@ struct EosRouteDst
   bool hasAnyTransforms() const { return (inMin.enabled || inMax.enabled || outMin.enabled || outMax.enabled); }
   bool operator==(const EosRouteDst &other) const;
   bool operator!=(const EosRouteDst &other) const { return !((*this) == other); }
-  bool operator<(const EosRouteDst &other) const;
 
   EosAddr addr;
   Protocol protocol = Protocol::kDefault;

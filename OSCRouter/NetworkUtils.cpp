@@ -262,26 +262,3 @@ bool EosRouteDst::operator==(const EosRouteDst &other) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-bool EosRouteDst::operator<(const EosRouteDst &other) const
-{
-  if (addr != other.addr)
-    return (addr < other.addr);
-  if (protocol != other.protocol)
-    return protocol < other.protocol;
-  if (path != other.path)
-    return (path < other.path);
-  if (script != other.script)
-    return script < other.script;
-  if (scriptText != other.scriptText)
-    return scriptText < other.scriptText;
-  if (inMin != other.inMin)
-    return (inMin < other.inMin);
-  if (inMax != other.inMax)
-    return (inMax < other.inMax);
-  if (outMin != other.outMin)
-    return (outMin < other.outMin);
-  return (outMax < other.outMax);
-}
-
-////////////////////////////////////////////////////////////////////////////////

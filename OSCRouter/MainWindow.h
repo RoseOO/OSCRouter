@@ -112,6 +112,7 @@ public:
 
   QSize sizeHint() const;
   void CheckForErrors();
+  void SetGlobals(ScriptEdit* globals) { m_Globals = globals; }
 
 private slots:
   void onErrorClicked(bool checked);
@@ -122,6 +123,7 @@ protected:
 private:
   QPushButton* m_Error;
   QString m_ErrorText;
+  QPointer<ScriptEdit> m_Globals;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -345,6 +347,7 @@ public:
   void LoadSettings(const Router::Settings& settings);
   void Save(QTextStream& stream);
   void SaveSettings(Router::Settings& settings);
+  ScriptEdit* GetScript() const { return m_Script; }
 
 protected:
   void showEvent(QShowEvent* event) override;
@@ -377,6 +380,7 @@ private:
   QComboBox* m_sACNInterface = nullptr;
   QComboBox* m_ArtNetInterface = nullptr;
   QCheckBox* m_LevelChangesOnly = nullptr;
+  ScriptEdit* m_Script = nullptr;
   QTableWidget* m_MIDI = nullptr;
 
   void LoadLine(const QString& line, Router::Settings& settings);
@@ -427,6 +431,7 @@ public:
   void Save(QTextStream& stream);
   void SaveRoutes(Router::ROUTES& routes, ItemStateTable& itemStateTable);
   void UpdateItemState(const ItemStateTable& itemStateTable);
+  void SetGlobals(ScriptEdit* globals) { m_Globals = globals; }
 
   static void StringToTransform(const QString& str, EosRouteDst::sTransform& transform);
   static void TransformToString(const EosRouteDst::sTransform& transform, QString& str);
@@ -538,6 +543,7 @@ private:
   Splitter* m_Cols = nullptr;
   RoutingCol* m_RoutingCols[static_cast<int>(Col::kCount)];
   HelpDialog m_Help;
+  QPointer<ScriptEdit> m_Globals;
 
   void LoadLine(const QString& line, Router::ROUTES& routes, ItemStateTable& itemStateTable);
   void AddRow(size_t id, bool remove, const QString& label, const Router::sRoute& route);

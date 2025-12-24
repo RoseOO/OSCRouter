@@ -24,6 +24,7 @@
 #include "QtInclude.h"
 #include "MainWindow.h"
 #include "EosPlatform.h"
+#include "UI.h"
 
 // must be last include
 #include "LeakWatcher.h"
@@ -56,7 +57,7 @@ int main(int argc, char *argv[])
 
   QApplication app(argc, argv);
 
-  QString fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
+  QString fixedFont = UI::FixedFont().family();
   app.setDesktopSettingsAware(false);
   app.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
   app.setStyleSheet(QString("QToolTip {border: 0.9px solid #3e3e42; padding: 4px; background-color: #2d2d2d; border-radius: 3px; color: #dcdcdc; font-family: %1;}").arg(fixedFont));

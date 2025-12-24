@@ -1196,6 +1196,7 @@ void RouterThread::BuildRoutes(ROUTES_BY_PORT &routesByPort, ROUTES_BY_PORT &rou
     // add destination
     ROUTE_DESTINATIONS &destinations = pathIter->second;
     sRouteDst routeDst;
+    routeDst.label = route.label;
     routeDst.dst = route.dst;
     routeDst.srcItemStateTableId = route.srcItemStateTableId;
     routeDst.dstItemStateTableId = route.dstItemStateTableId;
@@ -1755,7 +1756,7 @@ void RouterThread::ProcessRecvPacket(bool muteAllOutgoing, sACN &sacn, ArtNet &a
             if (protocol == Protocol::kOSC)
             {
               EosPacket packet;
-              if (MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, packet) && tcpClient->SendFramed(packet))
+              if (MakeOSCPacket(artnet, addr, protocol, path, routeDst, args, argsCount, packet) && tcpClient->SendFramed(packet))
               {
                 SetItemActivity(routeDst.dstItemStateTableId);
                 SetItemActivity(tcpClient->GetItemStateTableId());
@@ -1771,7 +1772,7 @@ void RouterThread::ProcessRecvPacket(bool muteAllOutgoing, sACN &sacn, ArtNet &a
         else if (protocol == Protocol::kOSC || protocol == Protocol::ksACN || protocol == Protocol::kArtNet || protocol == Protocol::kMIDI)
         {
           EosPacket oscPacket;
-          MakeOSCPacket(artnet, addr, protocol, path, routeDst.dst, args, argsCount, oscPacket);
+          MakeOSCPacket(artnet, addr, protocol, path, routeDst, args, argsCount, oscPacket);
 
           if (routeDst.dst.protocol == Protocol::kPSN)
           {
@@ -1822,10 +1823,10 @@ void RouterThread::ProcessRecvPacket(bool muteAllOutgoing, sACN &sacn, ArtNet &a
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet)
+bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const sRouteDst &route, OSCArgument *args, size_t argsCount, EosPacket &packet)
 {
   QString sendPath;
-  if (dst.script)
+  if (route.dst.script)
   {
     QString error;
 
@@ -1842,7 +1843,7 @@ bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol p
         }
       }
 
-      error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, /*args*/ nullptr, /*argsCount*/ 0, dmx.data(), dmx.size(), &packet, &m_PrivateLog);
+      error = m_ScriptEngine->evaluate(route.dst.scriptText, &m_PrivateLog, route.label, srcPath, /*args*/ nullptr, /*argsCount*/ 0, dmx.data(), dmx.size(), &packet);
     }
     else if (protocol == Protocol::kArtNet)
     {
@@ -1862,10 +1863,10 @@ bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol p
         }
       }
 
-      error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, args, argsCount, universe, universeCount, &packet, &m_PrivateLog);
+      error = m_ScriptEngine->evaluate(route.dst.scriptText, &m_PrivateLog, route.label, srcPath, args, argsCount, universe, universeCount, &packet);
     }
     else
-      error = m_ScriptEngine->evaluate(dst.scriptText, srcPath, args, argsCount, /*universe*/ nullptr, /*universeCount*/ 0, &packet, &m_PrivateLog);
+      error = m_ScriptEngine->evaluate(route.dst.scriptText, &m_PrivateLog, route.label, srcPath, args, argsCount, /*universe*/ nullptr, /*universeCount*/ 0, &packet);
 
     if (error.isEmpty())
       return true;
@@ -1874,7 +1875,7 @@ bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol p
     return false;
   }
 
-  MakeSendPath(artnet, addr, protocol, srcPath, dst.path, args, argsCount, sendPath);
+  MakeSendPath(artnet, addr, protocol, srcPath, route.dst.path, args, argsCount, sendPath);
   if (!sendPath.isEmpty())
   {
     size_t oscPacketSize = 0;
@@ -1885,7 +1886,7 @@ bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol p
     {
       oscPacketData = OSCPacketWriter::CreateForString(sendPath.toUtf8().constData(), oscPacketSize);
 
-      if (oscPacketData && oscPacketSize && dst.hasAnyTransforms())
+      if (oscPacketData && oscPacketSize && route.dst.hasAnyTransforms())
       {
         argsCount = 1;
         args = OSCArgument::GetArgs(oscPacketData, oscPacketSize, argsCount);
@@ -1893,7 +1894,7 @@ bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol p
         {
           OSCPacketWriter oscPacket(sendPath.left(index).toUtf8().constData());
 
-          if (ApplyTransform(args[0], dst, oscPacket))
+          if (ApplyTransform(args[0], route.dst, oscPacket))
           {
             delete[] oscPacketData;
             oscPacketData = oscPacket.Create(oscPacketSize);
@@ -1909,11 +1910,11 @@ bool RouterThread::MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol p
 
       if (protocol != Protocol::ksACN && protocol != Protocol::kArtNet)
       {
-        if (dst.hasAnyTransforms())
+        if (route.dst.hasAnyTransforms())
         {
           if (args && argsCount != 0)
           {
-            if (!ApplyTransform(args[0], dst, oscPacket))
+            if (!ApplyTransform(args[0], route.dst, oscPacket))
               return false;
           }
           else
@@ -2931,6 +2932,13 @@ void RouterThread::run()
   MIDI midi;
   BuildMIDI(routesByMIDI, midi);
 
+  if (!m_Settings.script.isEmpty())
+  {
+    QString error = m_ScriptEngine->evaluate(m_Settings.script, &m_PrivateLog);
+    if (!error.isEmpty())
+      OSCParserClient_Log(error.toStdString());
+  }
+
   while (m_Run)
   {
     MuteAll muteAll = GetMuteAll();
@@ -3638,10 +3646,11 @@ void RouterThread::LogMIDI(bool send, const std::string &name, const std::vector
 
 ////////////////////////////////////////////////////////////////////////////////
 
-QString ScriptEngine::evaluate(const QString &script, const QString &path /*= QString()*/, const OSCArgument *args /*= nullptr*/, size_t argsCount /*= 0*/, const uint8_t *universe /*= nullptr*/,
-                               size_t universeCount /*= 0*/, EosPacket *packet /*= nullptr*/, EosLog *log /*= nullptr*/)
+QString ScriptEngine::evaluate(const QString &script, EosLog *log /*= nullptr*/, const QString &label /*= QString()*/, const QString &path /*= QString()*/, const OSCArgument *args /*= nullptr*/,
+                               size_t argsCount /*= 0*/, const uint8_t *universe /*= nullptr*/, size_t universeCount /*= 0*/, EosPacket *packet /*= nullptr*/)
 {
   // set globals
+  m_JS.globalObject().setProperty(QLatin1String("NAME"), label);
   m_JS.globalObject().setProperty(QLatin1String("OSC"), path);
 
   QJSValue jsarray;

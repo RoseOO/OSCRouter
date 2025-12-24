@@ -130,8 +130,8 @@ public:
   ScriptEngine() = default;
 
   QJSEngine &js() { return m_JS; }
-  QString evaluate(const QString &script, const QString &path = QString(), const OSCArgument *args = nullptr, size_t argsCount = 0, const uint8_t *universe = nullptr, size_t universeCount = 0,
-                   EosPacket *packet = nullptr, EosLog *log = nullptr);
+  QString evaluate(const QString &script, EosLog *log = nullptr, const QString &label = QString(), const QString &path = QString(), const OSCArgument *args = nullptr, size_t argsCount = 0,
+                   const uint8_t *universe = nullptr, size_t universeCount = 0, EosPacket *packet = nullptr);
 
 private:
   QJSEngine m_JS;
@@ -170,6 +170,7 @@ public:
     QString sACNIP;
     QString artNetIP;
     bool levelChangesOnly = false;
+    QString script;
   };
 
   typedef std::vector<sRoute> ROUTES;
@@ -437,6 +438,7 @@ public:
 protected:
   struct sRouteDst
   {
+    QString label;
     EosRouteDst dst;
     ItemStateTable::ID srcItemStateTableId;
     ItemStateTable::ID dstItemStateTableId;
@@ -598,7 +600,7 @@ protected:
                             UDP_OUT_THREADS &udpOutThreads, TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, EosUdpInThread::RECV_Q &recvQ);
   virtual void ProcessRecvPacket(bool muteAllOutgoing, sACN &sacn, ArtNet &artnet, MIDI &midi, ROUTES_BY_PORT &routesByPort, DESTINATIONS_LIST &routingDestinationList, UDP_OUT_THREADS &udpOutThreads,
                                  TCP_SERVER_THREADS &tcpServerThreads, TCP_CLIENT_THREADS &tcpClientThreads, const EosAddr &addr, Protocol protocol, EosUdpInThread::sRecvPacket &recvPacket);
-  virtual bool MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const EosRouteDst &dst, OSCArgument *args, size_t argsCount, EosPacket &packet);
+  virtual bool MakeOSCPacket(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const QString &srcPath, const sRouteDst &route, OSCArgument *args, size_t argsCount, EosPacket &packet);
   virtual bool MakePSNPacket(EosPacket &osc, EosPacket &psn);
   virtual bool SendsACN(sACN &sacn, ArtNet &artnet, const EosAddr &addr, Protocol protocol, const sRouteDst &routeDst, EosPacket &osc);
   virtual bool SendArtNet(ArtNet &artnet, const EosAddr &addr, Protocol protocol, const EosRouteDst &dst, EosPacket &osc);

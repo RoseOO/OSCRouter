@@ -23,7 +23,7 @@
 #include "EosPlatform.h"
 #include "LogWidget.h"
 #include "Version.h"
-#include <time.h>
+#include "UI.h"
 
 #ifdef WIN32
 #include <Windows.h>
@@ -322,7 +322,7 @@ ScriptEdit::ScriptEdit(QWidget* parent /*= nullptr*/)
   : QTextEdit(parent)
 {
   setAcceptRichText(false);
-  setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+  setFont(UI::FixedFont());
   setWordWrapMode(QTextOption::NoWrap);
   setLineWrapMode(QTextEdit::NoWrap);
   setMinimumSize(60, 60);
@@ -343,7 +343,11 @@ QSize ScriptEdit::sizeHint() const
 
 void ScriptEdit::CheckForErrors()
 {
-  m_ErrorText = ScriptEngine().evaluate(toPlainText());
+  QString script;
+  if (m_Globals)
+    script = m_Globals->toPlainText() + QLatin1Char('\n');
+  script += toPlainText();
+  m_ErrorText = ScriptEngine().evaluate(script);
   m_Error->setVisible(!m_ErrorText.isEmpty());
 }
 
@@ -1131,6 +1135,14 @@ SettingsWidget::SettingsWidget(QSettings& settings, QWidget* parent /*= nullptr*
   grid->addWidget(m_LevelChangesOnly, row, 1);
   ++row;
 
+  label = new QLabel(tr("JavaScript Globals"), base);
+  label->setToolTip(tr("Declare global JavaScript variables\n\nEx:\nvar gPacketCounter = 0;"));
+  grid->addWidget(label, row, 0, Qt::AlignTop);
+  m_Script = new ScriptEdit(base);
+  m_Script->setToolTip(label->toolTip());
+  grid->addWidget(m_Script, row, 1);
+  ++row;
+
   QWidget* cell = new QWidget(base);
   grid->addWidget(cell, row, 0, Qt::AlignTop);
   QHBoxLayout* cellLayout = new QHBoxLayout(cell);
@@ -1190,6 +1202,8 @@ void SettingsWidget::LoadLine(const QString& line, Router::Settings& settings)
     settings.artNetIP = items[2];
     if (items.size() > 3)
       settings.levelChangesOnly = items[3].toInt() != 0;
+    if (items.size() > 4)
+      settings.script = items[4];
   }
 }
 
@@ -1199,6 +1213,8 @@ void SettingsWidget::LoadSettings(const Router::Settings& settings)
   SetInterface(m_sACNInterface, settings.sACNIP);
   SetInterface(m_ArtNetInterface, settings.artNetIP);
   m_LevelChangesOnly->setChecked(settings.levelChangesOnly);
+  m_Script->setText(settings.script);
+  m_Script->CheckForErrors();
 }
 
 void SettingsWidget::Save(QTextStream& stream)
@@ -1206,7 +1222,11 @@ void SettingsWidget::Save(QTextStream& stream)
   Router::Settings settings;
   SaveSettings(settings);
 
-  stream << QStringLiteral("Settings,%1,%2,%3\n").arg(FileUtils::QuotedString(settings.sACNIP)).arg(FileUtils::QuotedString(settings.artNetIP)).arg(settings.levelChangesOnly ? 1 : 0);
+  stream << QStringLiteral("Settings,%1,%2,%3,%4\n")
+                .arg(FileUtils::QuotedString(settings.sACNIP))
+                .arg(FileUtils::QuotedString(settings.artNetIP))
+                .arg(settings.levelChangesOnly ? 1 : 0)
+                .arg(FileUtils::QuotedString(settings.script));
 }
 
 void SettingsWidget::SaveSettings(Router::Settings& settings)
@@ -1214,6 +1234,7 @@ void SettingsWidget::SaveSettings(Router::Settings& settings)
   settings.sACNIP = GetInterface(m_sACNInterface);
   settings.artNetIP = GetInterface(m_ArtNetInterface);
   settings.levelChangesOnly = m_LevelChangesOnly->isChecked();
+  settings.script = m_Script->toPlainText();
 }
 
 void SettingsWidget::PopulateInterfaces(QComboBox* combo, const QString& defaultText)
@@ -1735,6 +1756,7 @@ void RoutingWidget::AddRow(size_t id, bool remove, const QString& label, const R
   row.outScriptText = new ScriptEdit(m_Cols->widget(col));
   row.outScriptText->hide();
   row.outScriptText->setText(route.dst.scriptText);
+  row.outScriptText->SetGlobals(m_Globals);
   row.outScriptText->CheckForErrors();
   AddCol(col++, {row.outPath, row.outScriptText});
   row.outPath->setVisible(!route.dst.script);
@@ -2302,7 +2324,7 @@ void RoutingWidget::onHeaderHelpClicked(size_t id)
     QGridLayout* layout = new QGridLayout(m_Help.dialog);
     layout->setContentsMargins(QMargins());
     m_Help.edit = new QTextEdit(m_Help.dialog);
-    m_Help.edit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    m_Help.edit->setFont(UI::FixedFont());
     m_Help.edit->setWordWrapMode(QTextOption::NoWrap);
     QPalette pal = m_Help.edit->palette();
     pal.setColor(QPalette::Base, pal.color(QPalette::Window));
@@ -2311,7 +2333,7 @@ void RoutingWidget::onHeaderHelpClicked(size_t id)
     layout->addWidget(m_Help.edit);
   }
 
-  m_Help.edit->setText(GetHelpText(static_cast<Col>(id), Protocol::kInvalid, Protocol::kInvalid, /*script*/ true));
+  m_Help.edit->setPlainText(GetHelpText(static_cast<Col>(id), Protocol::kInvalid, Protocol::kInvalid, /*script*/ true));
   m_Help.edit->document()->adjustSize();
 
   // adjust to document size
@@ -2475,8 +2497,10 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
             tr("Incoming MIDI:\n"
                "  Raw:\n"
                "    /midi=a,b,c...\n"
-               "  MIDI Show Control:\n"
-               "    /msc/<device ID>/<command format>/<command>=<string 1>, <string 2>, etc...");
+               "  MIDI Show Control:\n");
+
+        for (int i = 0; i < static_cast<int>(MSCCmd::kCount); ++i)
+          text += QStringLiteral("    /msc/<device ID>/<command format>/%1=<string 1>, <string 2>, etc...\n").arg(MSCCmdName(static_cast<MSCCmd>(i)));
       }
 
       if (!all)
@@ -2705,6 +2729,7 @@ QString RoutingWidget::GetHelpText(Col col, Protocol inProtocol, Protocol outPro
                "--------------------\n"
                "OSC = outgoing osc path (string)\n"
                "ARGS = array of osc arguments\n"
+               "NAME = name of route\n"
                "LOGS = array of log messages you may output\n"
                "\n"
                "Write your own JavaScript to modify the OSC and ARGS variables\n"
@@ -2840,6 +2865,7 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
   tabs->addTab(m_TcpWidget, tr("TCP"));
 
   m_SettingsWidget = new SettingsWidget(m_Settings, tabs);
+  m_RoutingWidget->SetGlobals(m_SettingsWidget->GetScript());
   tabs->addTab(m_SettingsWidget, tr("Settings"));
 
   QHBoxLayout* buttonLayout = new QHBoxLayout();
@@ -3076,9 +3102,9 @@ bool MainWindow::Load(const QString& path)
 
   Shutdown();
 
+  m_SettingsWidget->Load(lines);
   m_RoutingWidget->Load(lines);
   m_TcpWidget->Load(lines);
-  m_SettingsWidget->Load(lines);
 
   return true;
 }
@@ -3272,7 +3298,7 @@ void MainWindow::onViewHelp()
     incomingLabel->setAlignment(Qt::AlignCenter);
 
     QTextEdit* incomingEdit = new QTextEdit(base);
-    incomingEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    incomingEdit->setFont(UI::FixedFont());
     incomingEdit->setWordWrapMode(QTextOption::NoWrap);
     QPalette pal = incomingEdit->palette();
     pal.setColor(QPalette::Base, DARK_BG_COLOR);

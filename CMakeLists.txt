@@ -207,6 +207,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   MACOSX_BUNDLE ON
   MACOSX_BUNDLE_GUI_IDENTIFIER org.etc.${PROJECT_NAME}
   MACOSX_BUNDLE_ICON_FILE "icon.icns"
+  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+  MACOSX_BUNDLE_BUNDLE_NAME ${PROJECT_NAME}
+  MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
+  MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
 )
 
 if(WIN32)
@@ -225,9 +229,12 @@ elseif(APPLE)
       "$ENV{HOME}/Qt/*/macos/bin"
   )
   if(MACDEPLOYQT_EXECUTABLE)
+    message(STATUS "Found macdeployqt: ${MACDEPLOYQT_EXECUTABLE}")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
       COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    
-      COMMAND "${MACDEPLOYQT_EXECUTABLE}" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg
+      COMMAND "${MACDEPLOYQT_EXECUTABLE}" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg -always-overwrite
+      COMMAND echo "DMG created at $<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg"
+      VERBATIM
     )
   else()
     message(WARNING "macdeployqt not found - DMG will not be created automatically")

@@ -18,10 +18,16 @@ elseif(XCODE)
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3")
-  set(ENV{QTDIR} "$ENV{HOME}/Qt/6.10.1/macos")
+  # Set QTDIR if not already set (for local development)
+  if(NOT DEFINED ENV{QTDIR})
+    set(ENV{QTDIR} "$ENV{HOME}/Qt/6.10.1/macos")
+  endif()
 endif()
 
-set(CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+# Only set CMAKE_PREFIX_PATH if QTDIR is defined
+if(DEFINED ENV{QTDIR})
+  set(CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+endif()
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network Qml)
 qt_standard_project_setup()
 
@@ -208,8 +214,22 @@ if(WIN32)
     COMMAND cmd /C \"\"$ENV{QTDIR}\\bin\\windeployqt\" --force --no-translations --no-opengl-sw --no-compiler-runtime \"$<TARGET_FILE:${PROJECT_NAME}>\"\"
   )
 elseif(APPLE)
-  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    
-    COMMAND "$ENV{QTDIR}/bin/macdeployqt" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg
+  # Find macdeployqt - it should be in PATH when Qt is properly installed
+  find_program(MACDEPLOYQT_EXECUTABLE macdeployqt 
+    HINTS 
+      "${Qt6_DIR}/../../../bin"
+      "${Qt6_DIR}/../../bin"
+      "${Qt6_DIR}/../../../macos/bin"
+    PATHS
+      "$ENV{QTDIR}/bin"
+      "$ENV{HOME}/Qt/*/macos/bin"
   )
+  if(MACDEPLOYQT_EXECUTABLE)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    
+      COMMAND "${MACDEPLOYQT_EXECUTABLE}" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg
+    )
+  else()
+    message(WARNING "macdeployqt not found - DMG will not be created automatically")
+  endif()
 endif()

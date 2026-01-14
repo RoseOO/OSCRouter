@@ -1,0 +1,89 @@
+name: macOS Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [created, published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout OSCRouter
+      uses: actions/checkout@v4
+      with:
+        path: OSCRouter
+    
+    - name: Checkout EosSyncLib dependency
+      uses: actions/checkout@v4
+      with:
+        repository: ElectronicTheatreControlsLabs/EosSyncLib
+        path: EosSyncLib
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.10.1'
+        host: 'mac'
+        target: 'desktop'
+        arch: 'clang_64'
+        cache: true
+        modules: 'qtnetworkauth'
+    
+    - name: Configure CMake
+      working-directory: OSCRouter
+      run: |
+        mkdir build
+        cd build
+        cmake -G Xcode ..
+    
+    - name: Build with Xcode
+      working-directory: OSCRouter/build
+      run: |
+        xcodebuild -project OSCRouter.xcodeproj \
+                   -scheme OSCRouter \
+                   -configuration RelWithDebInfo \
+                   -allowProvisioningUpdates \
+                   CODE_SIGN_IDENTITY="" \
+                   CODE_SIGNING_REQUIRED=NO
+    
+    - name: Upload .app artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OSCRouter-macOS-${{ matrix.os }}-app
+        path: OSCRouter/build/RelWithDebInfo/OSCRouter.app
+        if-no-files-found: error
+    
+    - name: Upload .dmg artifact
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: OSCRouter-macOS-${{ matrix.os }}-dmg
+        path: OSCRouter/build/OSCRouter.dmg
+        if-no-files-found: warn
+    
+    - name: Rename DMG for release
+      if: github.event_name == 'release'
+      run: |
+        if [ -f OSCRouter/build/OSCRouter.dmg ]; then
+          mv OSCRouter/build/OSCRouter.dmg OSCRouter/build/OSCRouter-macOS-${{ matrix.os }}.dmg
+        fi
+    
+    - name: Upload DMG to Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: OSCRouter/build/OSCRouter-macOS-${{ matrix.os }}.dmg
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

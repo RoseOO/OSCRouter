@@ -3,8 +3,12 @@ name: macOS Build
 on:
   push:
     branches: [ main, develop, copilot/** ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main, develop ]
+  release:
+    types: [created, published]
   workflow_dispatch:
 
 jobs:
@@ -67,3 +71,19 @@ jobs:
         name: OSCRouter-macOS-${{ matrix.os }}-dmg
         path: OSCRouter/build/OSCRouter.dmg
         if-no-files-found: warn
+    
+    - name: Rename DMG for release
+      if: github.event_name == 'release'
+      run: |
+        if [ -f OSCRouter/build/OSCRouter.dmg ]; then
+          mv OSCRouter/build/OSCRouter.dmg OSCRouter/build/OSCRouter-macOS-${{ matrix.os }}.dmg
+        fi
+    
+    - name: Upload DMG to Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: OSCRouter/build/OSCRouter-macOS-${{ matrix.os }}.dmg
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -214,8 +214,14 @@ if(WIN32)
     COMMAND cmd /C \"\"$ENV{QTDIR}\\bin\\windeployqt\" --force --no-translations --no-opengl-sw --no-compiler-runtime \"$<TARGET_FILE:${PROJECT_NAME}>\"\"
   )
 elseif(APPLE)
-  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    
-    COMMAND "$ENV{QTDIR}/bin/macdeployqt" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg
-  )
+  # Find macdeployqt - it should be in PATH when Qt is properly installed
+  find_program(MACDEPLOYQT_EXECUTABLE macdeployqt HINTS "${Qt6_DIR}/../../../bin")
+  if(MACDEPLOYQT_EXECUTABLE)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    
+      COMMAND "${MACDEPLOYQT_EXECUTABLE}" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg
+    )
+  else()
+    message(WARNING "macdeployqt not found - DMG will not be created automatically")
+  endif()
 endif()

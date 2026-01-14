@@ -231,8 +231,8 @@ elseif(APPLE)
   if(MACDEPLOYQT_EXECUTABLE)
     message(STATUS "Found macdeployqt: ${MACDEPLOYQT_EXECUTABLE}")
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    
-      COMMAND "${MACDEPLOYQT_EXECUTABLE}" \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../..\" -dmg -always-overwrite
+      COMMAND rm -rf "$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg"    
+      COMMAND "${MACDEPLOYQT_EXECUTABLE}" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/../.." -dmg -always-overwrite
       COMMAND echo "DMG created at $<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg"
       VERBATIM
     )

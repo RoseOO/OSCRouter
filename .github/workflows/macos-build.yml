@@ -17,19 +17,19 @@ jobs:
       matrix:
         os: [macos-14, macos-15]
     runs-on: ${{ matrix.os }}
-    
+
     steps:
     - name: Checkout OSCRouter
       uses: actions/checkout@v4
       with:
         path: OSCRouter
-    
+
     - name: Checkout EosSyncLib dependency
       uses: actions/checkout@v4
       with:
         repository: ElectronicTheatreControlsLabs/EosSyncLib
         path: EosSyncLib
-    
+
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
@@ -39,14 +39,14 @@ jobs:
         arch: 'clang_64'
         cache: true
         modules: 'qtnetworkauth'
-    
+
     - name: Configure CMake
       working-directory: OSCRouter
       run: |
         mkdir build
         cd build
         cmake -G Xcode ..
-    
+
     - name: Build with Xcode
       working-directory: OSCRouter/build
       run: |
@@ -56,11 +56,11 @@ jobs:
                    -allowProvisioningUpdates \
                    CODE_SIGN_IDENTITY="" \
                    CODE_SIGNING_REQUIRED=NO
-        
+
         # Verify the build output
         echo "Build output:"
         ls -la RelWithDebInfo/
-        
+
         # Check if DMG was created
         if [ -f OSCRouter.dmg ]; then
           echo "DMG created successfully at $(pwd)/OSCRouter.dmg"
@@ -69,7 +69,7 @@ jobs:
           echo "Warning: DMG not found at expected location"
           find . -name "*.dmg" -type f
         fi
-    
+
     - name: Create properly packaged .app zip
       working-directory: OSCRouter/build
       run: |
@@ -85,14 +85,14 @@ jobs:
           echo "Error: OSCRouter.app not found"
           exit 1
         fi
-    
+
     - name: Upload .app zip artifact
       uses: actions/upload-artifact@v4
       with:
         name: OSCRouter-macOS-${{ matrix.os }}-app
         path: OSCRouter/build/OSCRouter-macOS-${{ matrix.os }}.zip
         if-no-files-found: error
-    
+
     - name: Upload .dmg artifact
       uses: actions/upload-artifact@v4
       if: success()
@@ -100,7 +100,7 @@ jobs:
         name: OSCRouter-macOS-${{ matrix.os }}-dmg
         path: OSCRouter/build/OSCRouter.dmg
         if-no-files-found: warn
-    
+
     - name: Prepare release assets
       if: github.event_name == 'release'
       run: |
@@ -110,14 +110,14 @@ jobs:
           cp OSCRouter.dmg OSCRouter-macOS-${{ matrix.os }}.dmg
           echo "Prepared OSCRouter-macOS-${{ matrix.os }}.dmg for release"
         fi
-        
+
         # The .app zip is already named correctly
         if [ -f OSCRouter-macOS-${{ matrix.os }}.zip ]; then
           echo "OSCRouter-macOS-${{ matrix.os }}.zip ready for release"
         fi
-        
+
         ls -lh
-    
+
     - name: Upload assets to Release
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2

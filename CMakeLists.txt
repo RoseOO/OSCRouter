@@ -215,7 +215,15 @@ if(WIN32)
   )
 elseif(APPLE)
   # Find macdeployqt - it should be in PATH when Qt is properly installed
-  find_program(MACDEPLOYQT_EXECUTABLE macdeployqt HINTS "${Qt6_DIR}/../../../bin")
+  find_program(MACDEPLOYQT_EXECUTABLE macdeployqt 
+    HINTS 
+      "${Qt6_DIR}/../../../bin"
+      "${Qt6_DIR}/../../bin"
+      "${Qt6_DIR}/../../../macos/bin"
+    PATHS
+      "$ENV{QTDIR}/bin"
+      "$ENV{HOME}/Qt/*/macos/bin"
+  )
   if(MACDEPLOYQT_EXECUTABLE)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
       COMMAND rm -rf \"$<TARGET_FILE_DIR:${PROJECT_NAME}>/../../../${PROJECT_NAME}.dmg\"    

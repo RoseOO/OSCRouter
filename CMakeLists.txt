@@ -18,10 +18,16 @@ elseif(XCODE)
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Manual")
   set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "")
   set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3")
-  set(ENV{QTDIR} "$ENV{HOME}/Qt/6.10.1/macos")
+  # Set QTDIR if not already set (for local development)
+  if(NOT DEFINED ENV{QTDIR})
+    set(ENV{QTDIR} "$ENV{HOME}/Qt/6.10.1/macos")
+  endif()
 endif()
 
-set(CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+# Only set CMAKE_PREFIX_PATH if QTDIR is defined
+if(DEFINED ENV{QTDIR})
+  set(CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+endif()
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network Qml)
 qt_standard_project_setup()
 

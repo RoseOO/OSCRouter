@@ -1,0 +1,58 @@
+name: macOS Build
+
+on:
+  push:
+    branches: [ main, develop, copilot/** ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    
+    steps:
+    - name: Checkout OSCRouter
+      uses: actions/checkout@v4
+      with:
+        path: OSCRouter
+    
+    - name: Checkout EosSyncLib dependency
+      uses: actions/checkout@v4
+      with:
+        repository: ElectronicTheatreControlsLabs/EosSyncLib
+        path: EosSyncLib
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.10.1'
+        host: 'mac'
+        target: 'desktop'
+        arch: 'clang_64'
+        cache: true
+        modules: 'qtnetworkauth'
+    
+    - name: Configure CMake
+      working-directory: OSCRouter
+      run: |
+        mkdir build
+        cd build
+        cmake -G Xcode ..
+    
+    - name: Build with Xcode
+      working-directory: OSCRouter/build
+      run: |
+        xcodebuild -project OSCRouter.xcodeproj \
+                   -scheme OSCRouter \
+                   -configuration RelWithDebInfo \
+                   -allowProvisioningUpdates \
+                   CODE_SIGN_IDENTITY="" \
+                   CODE_SIGNING_REQUIRED=NO
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OSCRouter-macOS
+        path: OSCRouter/build/RelWithDebInfo/OSCRouter.app
+        if-no-files-found: error

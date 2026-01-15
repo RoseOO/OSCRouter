@@ -2,7 +2,27 @@ Simple UDP/TCP packet router for Mac and Windows, with optional OSC specific opt
 
 ⭐ Now with support for sACN, ArtNet, PosiStageNet (PSN), MIDI, and Javascript
 
+🌐 **NEW**: Modern responsive web interface with JSON API on port 8081
+
 ![OSCRouter](https://github.com/user-attachments/assets/3255fbe8-712d-4797-b0c0-1d313a51a6c9)
+
+
+## Web Interface
+
+OSCRouter now includes a built-in web server that provides:
+- **Real-time status monitoring** - View server status and statistics
+- **Live logging** - Monitor logs in real-time with auto-refresh
+- **Configuration display** - View current routes, connections, and settings
+- **JSON API** - Programmatic access to status, config, and logs
+
+Access the web interface at `http://localhost:8081` when OSCRouter is running.
+
+### API Endpoints
+
+- `GET /` - Web dashboard (HTML)
+- `GET /api/status` - Current status and statistics (JSON)
+- `GET /api/config` - Current configuration (JSON)
+- `GET /api/logs` - Recent log messages (JSON)
 
 
 ## Example File (pictured above)

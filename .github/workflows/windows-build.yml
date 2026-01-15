@@ -78,7 +78,8 @@ jobs:
         Copy-Item -Path "OSCRouter.exe" -Destination "OSCRouter-Windows\" -ErrorAction Stop
         
         # Copy all DLLs (required)
-        if (-not (Test-Path "*.dll")) {
+        $dllFiles = Get-ChildItem -Path "*.dll" -File
+        if ($dllFiles.Count -eq 0) {
           throw "No DLLs found - windeployqt may not have run correctly"
         }
         Copy-Item -Path "*.dll" -Destination "OSCRouter-Windows\" -ErrorAction Stop
@@ -93,7 +94,11 @@ jobs:
         # Copy Qt styles plugin if it exists (optional)
         if (Test-Path "styles") {
           mkdir OSCRouter-Windows\styles
-          Copy-Item -Path "styles\*.dll" -Destination "OSCRouter-Windows\styles\" -ErrorAction Stop
+          try {
+            Copy-Item -Path "styles\*.dll" -Destination "OSCRouter-Windows\styles\" -ErrorAction Stop
+          } catch {
+            Write-Warning "Failed to copy styles plugin (optional): $_"
+          }
         }
         
         # Verify critical files exist

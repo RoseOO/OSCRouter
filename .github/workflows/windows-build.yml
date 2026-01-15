@@ -1,12 +1,6 @@
 name: Windows Build
 
 on:
-  push:
-    branches: [ main, develop ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main, develop ]
   release:
     types: [created, published]
   workflow_dispatch:

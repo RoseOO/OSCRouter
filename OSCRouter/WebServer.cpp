@@ -319,12 +319,12 @@ QJsonObject WebServer::GetConfigJson() const
     routeObj["muted"] = route.mute;
     
     QJsonObject src;
-    src["ip"] = QString::fromStdString(EosAddr::GetIPString(route.src.addr.ip));
+    src["ip"] = route.src.addr.ip;
     src["port"] = static_cast<int>(route.src.addr.port);
     routeObj["source"] = src;
     
     QJsonObject dst;
-    dst["ip"] = QString::fromStdString(EosAddr::GetIPString(route.dst.addr.ip));
+    dst["ip"] = route.dst.addr.ip;
     dst["port"] = static_cast<int>(route.dst.addr.port);
     routeObj["destination"] = dst;
     
@@ -338,7 +338,7 @@ QJsonObject WebServer::GetConfigJson() const
     QJsonObject connObj;
     connObj["label"] = conn.label;
     connObj["server"] = conn.server;
-    connObj["ip"] = QString::fromStdString(EosAddr::GetIPString(conn.addr.ip));
+    connObj["ip"] = conn.addr.ip;
     connObj["port"] = static_cast<int>(conn.addr.port);
     
     connections.append(connObj);
@@ -582,7 +582,7 @@ QString WebServer::GetIndexHtml() const
 <body>
     <div class="container">
         <header>
-            <h1>🎛️ OSCRouter</h1>
+            <h1>&#127979;&#65039; OSCRouter</h1>
             <p class="subtitle">Real-time Status Dashboard</p>
         </header>
         
@@ -590,7 +590,7 @@ QString WebServer::GetIndexHtml() const
             <div class="loading">Loading dashboard...</div>
         </div>
         
-        <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh Dashboard</button>
+        <button class="refresh-btn" onclick="loadDashboard()">&#128260; Refresh Dashboard</button>
     </div>
     
     <script>
@@ -634,7 +634,7 @@ QString WebServer::GetIndexHtml() const
             
             dashboard.innerHTML = `
                 <div class="card">
-                    <h2>📊 Server Status</h2>
+                    <h2>&#128202; Server Status</h2>
                     <div class="card-content">
                         <div>${statusIndicator}${status.server_status}</div>
                         <div style="margin-top: 10px; color: #808080;">Last updated: ${formatTimestamp(status.timestamp)}</div>
@@ -642,7 +642,7 @@ QString WebServer::GetIndexHtml() const
                 </div>
                 
                 <div class="card">
-                    <h2>📈 Statistics</h2>
+                    <h2>&#128200; Statistics</h2>
                     <div class="card-content">
                         <div>Routes: <span class="stat-value">${status.routes_count}</span></div>
                         <div>Connections: <span class="stat-value">${status.connections_count}</span></div>
@@ -651,7 +651,7 @@ QString WebServer::GetIndexHtml() const
                 </div>
                 
                 <div class="card" style="grid-column: 1 / -1;">
-                    <h2>📝 Recent Logs</h2>
+                    <h2>&#128221; Recent Logs</h2>
                     <div class="card-content">
                         <div class="log-container">
                             ${logs.slice(-50).reverse().map(log => `
@@ -665,14 +665,14 @@ QString WebServer::GetIndexHtml() const
                 </div>
                 
                 <div class="card" style="grid-column: 1 / -1;">
-                    <h2>⚙️ Current Configuration</h2>
+                    <h2>&#9881;&#65039; Current Configuration</h2>
                     <div class="card-content">
                         <div class="config-item">
                             <div class="config-label">Routes (${config.routes.length})</div>
                             ${config.routes.slice(0, 10).map(route => `
                                 <div style="margin-left: 15px; margin-top: 5px; color: #c0c0c0;">
-                                    ${route.label || 'Unnamed'}: ${route.source.ip}:${route.source.port} → ${route.destination.ip}:${route.destination.port}
-                                    ${route.enabled ? '✓' : '✗'} ${route.muted ? '🔇' : ''}
+                                    ${route.label || 'Unnamed'}: ${route.source.ip}:${route.source.port} &rarr; ${route.destination.ip}:${route.destination.port}
+                                    ${route.enabled ? '&#10003;' : '&#10007;'} ${route.muted ? '&#128263;' : ''}
                                 </div>
                             `).join('')}
                             ${config.routes.length > 10 ? `<div style="margin-left: 15px; margin-top: 5px; color: #808080;">... and ${config.routes.length - 10} more</div>` : ''}

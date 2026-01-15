@@ -44,6 +44,10 @@
 #include "Router.h"
 #endif
 
+#ifndef WEB_SERVER_H
+#include "WebServer.h"
+#endif
+
 class EosPlatform;
 class LogWidget;
 
@@ -615,6 +619,7 @@ private:
   bool m_DisableSystemIdle;
   QWidget* m_Help = nullptr;
   QWidget* m_About = nullptr;
+  WebServer* m_WebServer = nullptr;
 
   void Shutdown();
   void GetPersistentSavePath(QString& path) const;

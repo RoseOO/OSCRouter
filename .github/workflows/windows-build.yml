@@ -1,0 +1,124 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [created, published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout OSCRouter
+      uses: actions/checkout@v4
+      with:
+        path: OSCRouter
+
+    - name: Checkout EosSyncLib dependency
+      uses: actions/checkout@v4
+      with:
+        repository: ElectronicTheatreControlsLabs/EosSyncLib
+        path: EosSyncLib
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.10.1'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2022_64'
+        cache: true
+        modules: 'qtnetworkauth'
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Configure CMake
+      working-directory: OSCRouter
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 ..
+
+    - name: Build with MSBuild
+      working-directory: OSCRouter/build
+      run: |
+        cmake --build . --config RelWithDebInfo --parallel
+        
+        # Verify the build output
+        echo "Build output:"
+        dir RelWithDebInfo
+
+    - name: Run windeployqt
+      working-directory: OSCRouter/build/RelWithDebInfo
+      run: |
+        # windeployqt should have been run by CMakeLists.txt post-build command
+        # Verify Qt DLLs are present
+        echo "Checking for Qt DLLs:"
+        dir *.dll
+
+    - name: Create Windows zip package
+      working-directory: OSCRouter/build/RelWithDebInfo
+      run: |
+        # Create a clean distribution folder
+        mkdir OSCRouter-Windows
+        
+        # Copy executable (required)
+        copy OSCRouter.exe OSCRouter-Windows\
+        if ($LASTEXITCODE -ne 0) { throw "Failed to copy OSCRouter.exe" }
+        
+        # Copy all DLLs (required)
+        copy *.dll OSCRouter-Windows\
+        if ($LASTEXITCODE -ne 0) { throw "Failed to copy DLLs - windeployqt may not have run correctly" }
+        
+        # Copy Qt platforms plugin (required for Qt apps)
+        if (Test-Path "platforms") {
+          mkdir OSCRouter-Windows\platforms
+          copy platforms\*.dll OSCRouter-Windows\platforms\
+          if ($LASTEXITCODE -ne 0) { throw "Failed to copy platforms plugin" }
+        } else {
+          throw "platforms directory not found - Qt deployment incomplete"
+        }
+        
+        # Copy Qt styles plugin if it exists (optional)
+        if (Test-Path "styles") {
+          mkdir OSCRouter-Windows\styles
+          copy styles\*.dll OSCRouter-Windows\styles\
+          if ($LASTEXITCODE -ne 0) { Write-Warning "Failed to copy styles plugin (optional)" }
+        }
+        
+        # Verify critical files exist
+        if (-not (Test-Path "OSCRouter-Windows\OSCRouter.exe")) { throw "OSCRouter.exe missing from package" }
+        if (-not (Test-Path "OSCRouter-Windows\platforms\qwindows.dll")) { throw "Qt platform plugin missing from package" }
+        
+        # Create zip file
+        Compress-Archive -Path OSCRouter-Windows\* -DestinationPath ..\OSCRouter-Windows.zip
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create zip file" }
+        
+        echo "Created OSCRouter-Windows.zip"
+        dir ..\OSCRouter-Windows.zip
+
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OSCRouter-Windows
+        path: OSCRouter/build/OSCRouter-Windows.zip
+        if-no-files-found: error
+
+    - name: Upload to Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: OSCRouter/build/OSCRouter-Windows.zip
+        fail_on_unmatched_files: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

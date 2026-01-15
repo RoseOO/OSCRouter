@@ -376,7 +376,7 @@ QJsonArray WebServer::GetLogsJson() const
 
 QString WebServer::GetIndexHtml() const
 {
-  return R"(<!DOCTYPE html>
+  return R"HTMLDELIMITER(<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -706,7 +706,7 @@ QString WebServer::GetIndexHtml() const
     </script>
 </body>
 </html>
-)";
+)HTMLDELIMITER";
 }
 
 ////////////////////////////////////////////////////////////////////////////////

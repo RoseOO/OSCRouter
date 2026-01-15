@@ -30,7 +30,7 @@ endif()
 if(DEFINED ENV{QTDIR})
   set(CMAKE_PREFIX_PATH "$ENV{QTDIR}")
 endif()
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network Qml)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network Qml Svg)
 qt_standard_project_setup()
 
 include_directories(
@@ -196,7 +196,7 @@ source_group("Resource Files" FILES ${RESOURCE_FILES})
 qt_add_executable(${PROJECT_NAME} ${SOURCES} ${EOS_SYNC_LIBS_SOURCES} ${HEADERS} ${RESOURCE_FILES} ${BUNDLE_RESOURCE_FILES})
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets Qt6::Gui Qt6::Network Qt6::Qml)
+target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets Qt6::Gui Qt6::Network Qt6::Qml Qt6::Svg)
 
 if(WIN32)
   target_link_libraries(${PROJECT_NAME} PRIVATE winmm iphlpapi)

@@ -66,28 +66,34 @@ jobs:
         # Create a clean distribution folder
         mkdir OSCRouter-Windows
         
+        # Verify build output exists first
+        echo "Checking for OSCRouter.exe in current directory..."
+        if (-not (Test-Path "OSCRouter.exe")) {
+          echo "OSCRouter.exe not found. Listing directory contents:"
+          dir
+          throw "OSCRouter.exe not found in build output"
+        }
+        
         # Copy executable (required)
-        copy OSCRouter.exe OSCRouter-Windows\
-        if ($LASTEXITCODE -ne 0) { throw "Failed to copy OSCRouter.exe" }
+        Copy-Item -Path "OSCRouter.exe" -Destination "OSCRouter-Windows\" -ErrorAction Stop
         
         # Copy all DLLs (required)
-        copy *.dll OSCRouter-Windows\
-        if ($LASTEXITCODE -ne 0) { throw "Failed to copy DLLs - windeployqt may not have run correctly" }
+        if (-not (Test-Path "*.dll")) {
+          throw "No DLLs found - windeployqt may not have run correctly"
+        }
+        Copy-Item -Path "*.dll" -Destination "OSCRouter-Windows\" -ErrorAction Stop
         
         # Copy Qt platforms plugin (required for Qt apps)
-        if (Test-Path "platforms") {
-          mkdir OSCRouter-Windows\platforms
-          copy platforms\*.dll OSCRouter-Windows\platforms\
-          if ($LASTEXITCODE -ne 0) { throw "Failed to copy platforms plugin" }
-        } else {
+        if (-not (Test-Path "platforms")) {
           throw "platforms directory not found - Qt deployment incomplete"
         }
+        mkdir OSCRouter-Windows\platforms
+        Copy-Item -Path "platforms\*.dll" -Destination "OSCRouter-Windows\platforms\" -ErrorAction Stop
         
         # Copy Qt styles plugin if it exists (optional)
         if (Test-Path "styles") {
           mkdir OSCRouter-Windows\styles
-          copy styles\*.dll OSCRouter-Windows\styles\
-          if ($LASTEXITCODE -ne 0) { Write-Warning "Failed to copy styles plugin (optional)" }
+          Copy-Item -Path "styles\*.dll" -Destination "OSCRouter-Windows\styles\" -ErrorAction Stop
         }
         
         # Verify critical files exist
@@ -96,7 +102,6 @@ jobs:
         
         # Create zip file
         Compress-Archive -Path OSCRouter-Windows\* -DestinationPath ..\OSCRouter-Windows.zip
-        if ($LASTEXITCODE -ne 0) { throw "Failed to create zip file" }
         
         echo "Created OSCRouter-Windows.zip"
         dir ..\OSCRouter-Windows.zip

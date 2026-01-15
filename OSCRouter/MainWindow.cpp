@@ -2914,13 +2914,13 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
 
   // Initialize and start web server
   m_WebServer = new WebServer(this);
-  if (m_WebServer->Start(8081))
+  if (m_WebServer->Start(WebServer::DEFAULT_PORT))
   {
     m_Log.AddInfo(QString("Web interface available at http://localhost:%1").arg(m_WebServer->GetPort()).toUtf8().constData());
   }
   else
   {
-    m_Log.AddError("Failed to start web server on port 8081");
+    m_Log.AddError(QString("Failed to start web server on port %1").arg(WebServer::DEFAULT_PORT).toUtf8().constData());
   }
 
   m_RoutingWidget->LoadRoutes(Router::ROUTES(), ItemStateTable());

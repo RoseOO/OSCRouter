@@ -52,10 +52,15 @@ class WebServer : public QObject
   Q_OBJECT
 
 public:
+  static constexpr quint16 DEFAULT_PORT = 8081;
+  static constexpr size_t MAX_LOG_MESSAGES = 1000;
+  static constexpr int MAX_ROUTES_DISPLAYED = 10;
+  static constexpr int MAX_LOGS_DISPLAYED = 50;
+
   WebServer(QObject *parent = nullptr);
   virtual ~WebServer();
 
-  bool Start(quint16 port = 8081);
+  bool Start(quint16 port = DEFAULT_PORT);
   void Stop();
   bool IsRunning() const { return m_Server && m_Server->isListening(); }
   quint16 GetPort() const { return m_Server ? m_Server->serverPort() : 0; }
@@ -87,7 +92,6 @@ private:
   Router::Settings m_Settings;
   ItemStateTable m_ItemStateTable;
   std::deque<LogEntry> m_LogMessages;
-  static const size_t MAX_LOG_MESSAGES = 1000;
 
   void HandleRequest(QTcpSocket *socket, const QString &method, const QString &path, const QByteArray &body);
   void SendResponse(QTcpSocket *socket, int statusCode, const QString &contentType, const QByteArray &body);

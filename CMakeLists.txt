@@ -216,9 +216,23 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 if(WIN32)
-  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND cmd /C \"\"$ENV{QTDIR}\\bin\\windeployqt\" --force --no-translations --no-opengl-sw --no-compiler-runtime \"$<TARGET_FILE:${PROJECT_NAME}>\"\"
+  # Find windeployqt - it should be in PATH when Qt is properly installed
+  find_program(WINDEPLOYQT_EXECUTABLE windeployqt
+    HINTS
+      "${Qt6_DIR}/../../../bin"
+      "${Qt6_DIR}/../../bin"
+    PATHS
+      "$ENV{QTDIR}/bin"
   )
+  if(WINDEPLOYQT_EXECUTABLE)
+    message(STATUS "Found windeployqt: ${WINDEPLOYQT_EXECUTABLE}")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND "${WINDEPLOYQT_EXECUTABLE}" --force --no-translations --no-opengl-sw --no-compiler-runtime "$<TARGET_FILE:${PROJECT_NAME}>"
+      VERBATIM
+    )
+  else()
+    message(WARNING "windeployqt not found - Qt dependencies will not be deployed automatically")
+  endif()
 elseif(APPLE)
   # Find macdeployqt - it should be in PATH when Qt is properly installed
   find_program(MACDEPLOYQT_EXECUTABLE macdeployqt 

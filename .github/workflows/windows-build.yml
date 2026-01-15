@@ -72,24 +72,37 @@ jobs:
         # Create a clean distribution folder
         mkdir OSCRouter-Windows
         
-        # Copy executable and all DLLs
+        # Copy executable (required)
         copy OSCRouter.exe OSCRouter-Windows\
-        copy *.dll OSCRouter-Windows\ 2>nul || echo "No DLLs to copy (might be an error)"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to copy OSCRouter.exe" }
         
-        # Copy Qt platforms plugin
+        # Copy all DLLs (required)
+        copy *.dll OSCRouter-Windows\
+        if ($LASTEXITCODE -ne 0) { throw "Failed to copy DLLs - windeployqt may not have run correctly" }
+        
+        # Copy Qt platforms plugin (required for Qt apps)
         if (Test-Path "platforms") {
           mkdir OSCRouter-Windows\platforms
           copy platforms\*.dll OSCRouter-Windows\platforms\
+          if ($LASTEXITCODE -ne 0) { throw "Failed to copy platforms plugin" }
+        } else {
+          throw "platforms directory not found - Qt deployment incomplete"
         }
         
-        # Copy Qt styles plugin if it exists
+        # Copy Qt styles plugin if it exists (optional)
         if (Test-Path "styles") {
           mkdir OSCRouter-Windows\styles
           copy styles\*.dll OSCRouter-Windows\styles\
+          if ($LASTEXITCODE -ne 0) { Write-Warning "Failed to copy styles plugin (optional)" }
         }
+        
+        # Verify critical files exist
+        if (-not (Test-Path "OSCRouter-Windows\OSCRouter.exe")) { throw "OSCRouter.exe missing from package" }
+        if (-not (Test-Path "OSCRouter-Windows\platforms\qwindows.dll")) { throw "Qt platform plugin missing from package" }
         
         # Create zip file
         Compress-Archive -Path OSCRouter-Windows\* -DestinationPath ..\OSCRouter-Windows.zip
+        if ($LASTEXITCODE -ne 0) { throw "Failed to create zip file" }
         
         echo "Created OSCRouter-Windows.zip"
         dir ..\OSCRouter-Windows.zip

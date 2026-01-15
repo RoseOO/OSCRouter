@@ -2912,6 +2912,17 @@ MainWindow::MainWindow(EosPlatform* platform, QWidget* parent /*=0*/, Qt::Window
   QString version = QLatin1String(VER_PRODUCTNAME_STR) + QLatin1Char(' ') + QLatin1String(VER_PRODUCTVERSION_STR);
   m_Log.AddInfo(version.toUtf8().constData());
 
+  // Initialize and start web server
+  m_WebServer = new WebServer(this);
+  if (m_WebServer->Start(8081))
+  {
+    m_Log.AddInfo(QString("Web interface available at http://localhost:%1").arg(m_WebServer->GetPort()).toUtf8().constData());
+  }
+  else
+  {
+    m_Log.AddError("Failed to start web server on port 8081");
+  }
+
   m_RoutingWidget->LoadRoutes(Router::ROUTES(), ItemStateTable());
   m_TcpWidget->LoadConnections(Router::CONNECTIONS());
   m_SettingsWidget->LoadSettings(Router::Settings());
@@ -3026,6 +3037,15 @@ bool MainWindow::BuildRoutes()
 
   Router::Settings settings;
   m_SettingsWidget->SaveSettings(settings);
+
+  // Update web server with configuration
+  if (m_WebServer)
+  {
+    m_WebServer->SetRoutes(routes);
+    m_WebServer->SetConnections(connections);
+    m_WebServer->SetSettings(settings);
+    m_WebServer->SetStatus(routes.empty() ? "Stopped" : "Running");
+  }
 
   if (!routes.empty())
   {
@@ -3180,6 +3200,23 @@ void MainWindow::SyncRouterThread(bool logsOnly)
 
   m_Log.Flush(m_TempLogQ);
   FlushLogQ(m_TempLogQ);
+  
+  // Update web server with log messages
+  if (m_WebServer)
+  {
+    for (const EosLog::sLogMsg &msg : m_TempLogQ)
+    {
+      QString type;
+      switch (msg.type)
+      {
+        case EosLog::LOG_MSG_TYPE_ERROR: type = "error"; break;
+        case EosLog::LOG_MSG_TYPE_WARNING: type = "warning"; break;
+        default: type = "info"; break;
+      }
+      m_WebServer->AddLogMessage(QString::fromStdString(msg.text), type);
+    }
+  }
+  
   m_TempLogQ.clear();
 
   if (!logsOnly)
@@ -3188,6 +3225,13 @@ void MainWindow::SyncRouterThread(bool logsOnly)
     {
       m_RoutingWidget->UpdateItemState(m_ItemStateTable);
       m_TcpWidget->UpdateItemState(m_ItemStateTable);
+      
+      // Update web server with item state table
+      if (m_WebServer)
+      {
+        m_WebServer->SetItemStateTable(m_ItemStateTable);
+      }
+      
       m_ItemStateTable.Reset();
     }
   }

@@ -55,7 +55,11 @@ public:
   bool dirty = false;
   
   // Timestamp of last activity for tolerance checking
-  std::chrono::steady_clock::time_point lastActivityTime = std::chrono::steady_clock::now();
+  // Initialized to epoch (time_point{}) and set when first activity is detected
+  std::chrono::steady_clock::time_point lastActivityTime{};
+  
+  // Track if activity has ever been detected for this item
+  bool hasHadActivity = false;
 
   static void GetStateName(EnumState state, QString &name);
   static void GetStateColor(EnumState state, QColor &color);

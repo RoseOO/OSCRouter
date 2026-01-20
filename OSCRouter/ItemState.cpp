@@ -125,6 +125,7 @@ void ItemStateTable::Update(ID id, const ItemState &other)
   if (other.activity)
   {
     itemState.lastActivityTime = std::chrono::steady_clock::now();
+    itemState.hasHadActivity = true;
   }
   
   // Apply tolerance for disconnect states to prevent false disconnect reporting
@@ -132,7 +133,8 @@ void ItemStateTable::Update(ID id, const ItemState &other)
   // transition to NOT_CONNECTED state
   ItemState::EnumState newState = other.state;
   if (newState == ItemState::STATE_NOT_CONNECTED && 
-      itemState.state == ItemState::STATE_CONNECTED)
+      itemState.state == ItemState::STATE_CONNECTED &&
+      itemState.hasHadActivity)  // Only apply tolerance if we've had activity
   {
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

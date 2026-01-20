@@ -76,7 +76,11 @@ void* Bridge_BeginActivity(const std::string &reason, std::string &error)
 			const char *reasonStr = ((reason.empty() || reason.c_str()==0)
 				? "routing started"
 				: reason.c_str());
-			activity = [processInfo beginActivityWithOptions:NSActivityUserInitiated|NSActivityLatencyCritical reason:[NSString stringWithUTF8String:reasonStr]];
+			// Use NSActivityIdleDisplaySleepDisabled to prevent display sleep in addition to
+			// NSActivityIdleSystemSleepDisabled (implied by NSActivityUserInitiated) to prevent system sleep.
+			// Also use NSActivityLatencyCritical for low-latency networking requirements.
+			NSActivityOptions options = NSActivityUserInitiated | NSActivityLatencyCritical | NSActivityIdleDisplaySleepDisabled;
+			activity = [processInfo beginActivityWithOptions:options reason:[NSString stringWithUTF8String:reasonStr]];
 			if(activity == nil)
 				error = "beginActivityWithOptions failed";
 			else

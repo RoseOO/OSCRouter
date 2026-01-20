@@ -120,10 +120,35 @@ void ItemStateTable::Update(ID id, const ItemState &other)
     return;
 
   ItemState &itemState = m_List[id];
-  if (itemState.state == other.state && itemState.activity == other.activity)
+  
+  // Record activity timestamp when activity is detected
+  if (other.activity)
+  {
+    itemState.lastActivityTime = std::chrono::steady_clock::now();
+  }
+  
+  // Apply tolerance for disconnect states to prevent false disconnect reporting
+  // If there was recent activity within the tolerance window, don't immediately
+  // transition to NOT_CONNECTED state
+  ItemState::EnumState newState = other.state;
+  if (newState == ItemState::STATE_NOT_CONNECTED && 
+      itemState.state == ItemState::STATE_CONNECTED)
+  {
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - itemState.lastActivityTime).count();
+    
+    // If activity was detected within the tolerance window, keep the connected state
+    if (elapsed < ItemState::STATE_TOLERANCE_MS)
+    {
+      newState = ItemState::STATE_CONNECTED;
+    }
+  }
+  
+  if (itemState.state == newState && itemState.activity == other.activity)
     return;
 
-  itemState.state = other.state;
+  itemState.state = newState;
   itemState.activity = other.activity;
   itemState.dirty = true;
   m_Dirty = true;

@@ -23,6 +23,7 @@
 #define ITEM_STATE_H
 
 #include <vector>
+#include <chrono>
 
 class QColor;
 class QString;
@@ -42,12 +43,19 @@ public:
     STATE_COUNT
   };
 
+  // Tolerance settings for connection state checks to prevent false disconnect reporting
+  // When activity is detected within this window, the state will remain connected
+  static constexpr int STATE_TOLERANCE_MS = 3000;  // 3 second tolerance window
+
   ItemState() = default;
 
   EnumState state = STATE_UNINITIALIZED;
   bool activity = false;
   bool mute = false;
   bool dirty = false;
+  
+  // Timestamp of last activity for tolerance checking
+  std::chrono::steady_clock::time_point lastActivityTime = std::chrono::steady_clock::now();
 
   static void GetStateName(EnumState state, QString &name);
   static void GetStateColor(EnumState state, QColor &color);

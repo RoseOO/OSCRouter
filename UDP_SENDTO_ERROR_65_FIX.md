@@ -28,6 +28,8 @@ setsockopt(m_Socket, SOL_SOCKET, SO_REUSEPORT, ...);
 setsockopt(m_Socket, SOL_SOCKET, SO_REUSEADDR, ...);
 ```
 
+Note: The `int optval = 1;` declaration was moved to the beginning of the socket initialization block since it's now used by multiple socket options (both the new REUSEPORT/REUSEADDR options and the existing BROADCAST option).
+
 ### Windows (`EosUdp_Win.cpp`)
 ```cpp
 // Set SO_REUSEADDR to allow UDP socket to coexist with TCP on same port

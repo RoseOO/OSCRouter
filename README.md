@@ -55,8 +55,9 @@ You can route one incoming source to multiple outputs, each with different path 
 2. Each route can have a **different outgoing** destination and path
 
 **Path Remapping Examples:**
-- Use `%1`, `%2`, `%3`, etc. to reference parts of the incoming OSC path
-- Input: `/eos/out/event/cue/1/25/fire` → Path: `/cue/%6/start` → Output: `/cue/25/start`
+- Use `%1`, `%2`, `%3`, etc. to reference segments of the incoming OSC path (1-indexed)
+- Input: `/eos/out/event/cue/1/25/fire` (segments: 1=eos, 2=out, 3=event, 4=cue, 5=1, 6=25, 7=fire)
+  - Path: `/cue/%6/start` → Output: `/cue/25/start` (uses segment 6 = "25")
 - Remap path to argument: `/cue/25/start` → Path: `/eos/cue/fire=%2` → Output: `/eos/cue/fire, 25(i)`
 
 ## Example File (pictured above)

@@ -1,0 +1,57 @@
+diff --git a/EosSyncLib/EosUdp_Mac.cpp b/EosSyncLib/EosUdp_Mac.cpp
+index 5bb0c8a..b21ba37 100755
+--- a/EosSyncLib/EosUdp_Mac.cpp
++++ b/EosSyncLib/EosUdp_Mac.cpp
+@@ -214,6 +214,24 @@ bool EosUdpOut_Mac::Initialize(EosLog &log, const char *ip, unsigned short port,
+       m_Socket = socket(AF_INET, SOCK_DGRAM, 0);
+       if (m_Socket != -1)
+       {
++        // Set SO_REUSEPORT to allow UDP socket to coexist with TCP on same port
++        // This prevents error 65 (EHOSTUNREACH) on macOS when TCP is using the same port
++        int optval = 1;
++        if (setsockopt(m_Socket, SOL_SOCKET, SO_REUSEPORT, reinterpret_cast<const char *>(&optval), sizeof(optval)) == -1)
++        {
++          char text[256];
++          sprintf(text, "%s setsockopt(SO_REUSEPORT) failed with error %d", EosUdpIn::GetLogPrefix(m_LogPrefix), errno);
++          log.AddWarning(text);
++        }
++
++        // Set SO_REUSEADDR for additional compatibility
++        if (setsockopt(m_Socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&optval), sizeof(optval)) == -1)
++        {
++          char text[256];
++          sprintf(text, "%s setsockopt(SO_REUSEADDR) failed with error %d", EosUdpIn::GetLogPrefix(m_LogPrefix), errno);
++          log.AddWarning(text);
++        }
++
+         if (multicast)
+         {
+           in_addr addr;
+@@ -228,7 +246,6 @@ bool EosUdpOut_Mac::Initialize(EosLog &log, const char *ip, unsigned short port,
+         }
+         else
+         {
+-          int optval = 1;
+           if (setsockopt(m_Socket, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char *>(&optval), sizeof(optval)) == -1)
+           {
+             char text[256];
+diff --git a/EosSyncLib/EosUdp_Win.cpp b/EosSyncLib/EosUdp_Win.cpp
+index 3c68d60..5c9c3f8 100644
+--- a/EosSyncLib/EosUdp_Win.cpp
++++ b/EosSyncLib/EosUdp_Win.cpp
+@@ -253,7 +253,15 @@ bool EosUdpOut_Win::Initialize(EosLog &log, const char *ip, unsigned short port,
+         m_Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+         if (m_Socket != INVALID_SOCKET)
+         {
++          // Set SO_REUSEADDR to allow UDP socket to coexist with TCP on same port
+           int optval = 1;
++          if (setsockopt(m_Socket, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval, sizeof(optval)) == SOCKET_ERROR)
++          {
++            char text[256];
++            sprintf(text, "%s setsockopt(SO_REUSEADDR) failed with error %d", EosUdpIn::GetLogPrefix(m_LogPrefix), WSAGetLastError());
++            log.AddWarning(text);
++          }
++
+           if (setsockopt(m_Socket, SOL_SOCKET, SO_BROADCAST, (const char *)&optval, sizeof(optval)) == SOCKET_ERROR)
+           {
+             char text[256];

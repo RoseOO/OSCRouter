@@ -25,6 +25,41 @@ Access the web interface at `http://localhost:8081` when OSCRouter is running.
 - `GET /api/logs` - Recent log messages (JSON)
 
 
+## TCP Connections
+
+OSCRouter supports both TCP client and TCP server modes for OSC communication.
+
+### TCP Server Mode
+To receive OSC over TCP using Packet Length framing:
+1. **TCP Tab**: Add a connection with Mode="Server", Framing="OSC 1.0" (4-byte packet length header), and specify IP/Port
+2. **Routing Tab**: Create routes with the **same port number** to forward incoming packets
+
+The TCP server listens for incoming connections. When a client connects, packets received on that connection are processed against the routing table. **Important**: The TCP tab only sets up the connection - you must create routes in the Routing tab to forward packets.
+
+### TCP Client Mode
+To send OSC over TCP:
+1. **TCP Tab**: Add a connection with Mode="Client", Framing="OSC 1.0", and specify the server IP/Port
+2. **Routing Tab**: Create routes with the destination IP/Port matching the TCP client connection
+
+When a route's destination matches a TCP client connection, packets are sent over TCP instead of UDP.
+
+### Framing Options
+- **OSC 1.0**: Packets framed by 4-byte packet size header (Packet Length framing)
+- **OSC 1.1**: Packets framed by SLIP (RFC 1055)
+
+## Multiple Outputs per Input
+
+You can route one incoming source to multiple outputs, each with different path transformations:
+
+1. Create multiple routes with the **same incoming** IP/Port/Path
+2. Each route can have a **different outgoing** destination and path
+
+**Path Remapping Examples:**
+- Use `%1`, `%2`, `%3`, etc. to reference segments of the incoming OSC path (1-indexed)
+- Input: `/eos/out/event/cue/1/25/fire` (segments: 1=eos, 2=out, 3=event, 4=cue, 5=1, 6=25, 7=fire)
+  - Path: `/cue/%6/start` → Output: `/cue/25/start` (uses segment 6 = "25")
+- Remap path to argument: `/cue/25/start` → Path: `/eos/cue/fire=%2` → Output: `/eos/cue/fire, 25(i)`
+
 ## Example File (pictured above)
 
 [example.osc.txt](https://github.com/user-attachments/files/24332375/example.osc.txt)

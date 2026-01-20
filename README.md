@@ -76,6 +76,15 @@ We also welcome pull requests for bug fixes and feature additions.
 [Eos Manual: OSC](https://www.etcconnect.com/WebDocs/Controls/EosFamilyOnlineHelp/en/Content/23_Show_Control/08_OSC/OPEN_SOUND_CONTROL.htm)
 
 
+# Troubleshooting
+
+## UDP Output Error 65 on macOS
+
+If you see `sendto failed with error 65` when trying to send UDP data (e.g., to QLab5), especially when TCP connections exist on the same port, see [UDP_SENDTO_ERROR_65_FIX.md](UDP_SENDTO_ERROR_65_FIX.md) for the fix.
+
+**Quick fix**: Apply the included patch to EosSyncLib and rebuild OSCRouter.
+
+
 # Dependencies
 
 - Requires [EosSyncLib](https://github.com/ElectronicTheatreControlsLabs/EosSyncLib)
